@@ -5405,6 +5405,10 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 | D9 | 计划未指定 `.env` 加载方式（原依赖清单含 `@nestjs/config`） | 不加 dotenv/@nestjs/config，改用 Node 24 原生 `node --env-file-if-exists=.env`（`start`/`start:dev` 脚本） | 减少一个依赖（供应链更小）；进程已有环境变量优先，符合部署直觉；生产可为 `.env` 设置严格文件权限 |
 | D10 | 计划 `test` 直接用 `jest` | 改为 `node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand` | jest 被 npm workspaces 提升到根 `node_modules`，`apps/server/node_modules/jest` 不存在（实测 `Cannot find module`） |
 | D11 | 计划未包含 `.env` 本地生成 | 本地开发 `.env` 用脚本生成随机 32 字节密钥（仅本地、已被 `.gitignore` 忽略） | 实测：直接复制 `.env.example` 会因占位秘密而**拒绝启动**（`配置校验失败: 环境变量 JWT_SECRET 长度不足 32 或仍为占位值`，退出码 1），属预期的安全行为 |
+| D12 | `CONFIG` 提供者只放在 `AppModule.providers` | 新增 `@Global()` 的 `AppConfigModule` 并导出 `CONFIG`，由 `AppModule` 引入 | 实测报错 `Nest can't resolve dependencies of the DATABASE (?). Please make sure that the argument "CONFIG" ...`：跨模块（DatabaseModule/AuthModule）注入必须由全局模块导出 |
+| D13 | 计划按 better-sqlite3 旧版 API 读取 PRAGMA 标量 | 新增 `readPragma()` 归一化：v13 的 `pragma()` 返回**行数组**（如 `[{"journal_mode":"wal"}]`），且 `busy_timeout` 的键名是 `timeout`；启动时新增 `busy_timeout=5000` 与外键生效断言 | 实测 `pragma('journal_mode')` 返回 `[{"journal_mode":"wal"}]`，直接 `String()` 得到 `[object Object]`，导致 WAL 断言误判 |
+| D14 | `users.banned_by` 用内联 `references(() => users.id)` | 改为在表约束中用 `foreignKey({ name: 'users_banned_by_fk', ... }).onDelete('set null')` | 自引用导致 TS 循环推断：`TS7022 'users' implicitly has type 'any'`、`TS7024`。迁移文件已重新生成为单一 `0000_*.sql`（尚未发布，未违反「已发布迁移不可改」） |
+| D15 | 未指定 migration 产物目录的清理策略 | schema 调整后删除 `drizzle/` 并重新生成，保证 Phase 1 只留下一个干净的首版迁移 | 避免在未发布的同一阶段堆叠修补型迁移（`0000` + `0001`） |
 
 
 
