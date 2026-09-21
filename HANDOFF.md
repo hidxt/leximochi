@@ -141,7 +141,8 @@ leximochi/
 ```
 
 ### 进行中
-- 无（等待用户批准 Phase 1 计划）。
+- 已完成：6 项架构决策确认（第 10.1 节）、依赖版本核验与清单（第 10.2 节）、原生模块与 JDK/SDK 兼容性验证。
+- 等待：用户确认版本清单后开始 Phase 1 实现。
 
 ### 未完成
 - Phase 1 全部内容：Monorepo 初始化、npm workspaces、`.gitignore`/`.env.example`/`README`、NestJS 服务端骨架、SQLite + WAL + migration、ORM 选型、账号注册/登录、`CaptchaProvider` 抽象、恢复码、Access/Refresh Token 与会话管理、RBAC 与管理员权限分离、React Web 骨架、React Native Android 骨架、React Admin 骨架、API SDK、基础测试、开发文档。
@@ -204,13 +205,81 @@ leximochi/
 | AI 能力由用户自带 API Key，服务端 AEAD 加密存储，文本/STT/TTS/Realtime 分别配置 | 基线要求；平台不承担用户模型费用 |
 | 时间统一 UTC 存储，客户端本地时区展示 | 基线要求 |
 
-**尚未决策、需要用户确认的点**（Phase 1 前）：
+### 10.1 已由用户确认的决策（2026-09-21）
 
-1. **ORM 选型**：Prisma 还是 Drizzle（对比维度：SQLite 支持、migration 稳定性与可读性、类型安全、与 NestJS 集成成本、生成物体积）。最终选择与理由将写入 `docs/` 架构文档。
-2. **Maven/Gradle 依赖源策略**：本机直连 `repo.maven.apache.org` 失败（需代理），可选方案：(a) 项目内 Gradle 代理配置指向 `127.0.0.1:10808`；(b) 项目内声明阿里云镜像仓库。属供应链决策，倾向 (a) 以保持官方源，需用户确认。
-3. **Android 是否需要补充 SDK 平台与模拟器**：当前仅 `android-37.0`、无 AVD。若选定的 RN 版本要求 compileSdk 35/36，需要下载 SDK 平台；若要跑模拟器，还需下载系统镜像并创建 AVD（两者均需用户批准）。
-4. **JDK 版本是否升级到 21**：若选定的 RN/AGP 版本要求 JDK 21，则需申请安装新 JDK（需用户批准）。
-5. **依赖版本策略**：RN / NestJS / React 具体主版本（倾向取当时最新稳定且互相兼容的组合，需在 Phase 1 核验并记录）。
+| # | 决策点 | 用户确认结果 |
+| --- | --- | --- |
+| 1 | ORM 选型 | **Drizzle ORM + better-sqlite3**（轻量、TS 原生、可直接执行 PRAGMA 控制 WAL/`busy_timeout`/外键、同步 API 与 SQLite 契合）。备选 Prisma 未采用。 |
+| 2 | Maven/Gradle 依赖源 | **项目内 Gradle 代理配置指向 `127.0.0.1:10808`**，保持 Google 官方 Maven 与 Maven Central 官方源，不修改全局配置、不使用第三方镜像。 |
+| 3 | Android Phase 1 验证程度 | **仅补装所需 SDK 平台，验证可构建**（以 Gradle 产出 debug APK 为证据）；不下载模拟器镜像、不创建 AVD、运行验证推迟。 |
+| 4 | JDK 版本 | **保持 JDK 17**；仅当实测证明必须 JDK 21 时才提出安装申请（附缺什么/为什么/版本/来源/影响/替代方案）。 |
+| 5 | 依赖主版本策略 | **官方最新稳定组合，先给出本清单待确认后再安装**。 |
+| 6 | `开发提示词.md` 是否入库 | **保留在仓库中**（理由：新 Agent 克隆后需能读到需求基线）。 |
+
+### 10.2 依赖版本清单（已核验，待用户确认后安装）
+
+核验依据：`npm view` 元数据、RN 0.87.1 官方模板与 `libs.versions.toml`、AGP jar 字节码反汇编。**尚未安装任何依赖。**
+
+**工具链 / 语言（全仓库统一）**
+
+| 项 | 选定版本 | 核验结论 |
+| --- | --- | --- |
+| Node.js | 现有 v24.19.0 | RN 0.87.1 engines `^22.13.0 \|\| ^24.3.0 \|\| >=26` ✅；NestJS 12 `>=20` ✅；Vite 8 `^20.19 \|\| >=22.12` ✅ |
+| TypeScript | **6.0.3** | NestJS CLI 12.0.3 用 `~6.0.2`、RN 0.87.1 模板用 `^6.0.3` → 统一 6.0.3；**不使用** latest 7.0.2（工具链尚未跟进） |
+| 包管理器 | npm 11.17.0 + workspaces | 不引入 pnpm/Bun/Yarn |
+| JDK | 现有 **JDK 17.0.20.1** | 已反汇编确认 AGP 9.2.1 `minRequiredJavaVersion()` 正常路径返回 `VERSION_17`（`VERSION_21` 分支仅用于模拟 AGP ≥ `10.0.0-alpha01` 的测试场景）→ **无需 JDK 21** |
+
+**Android（版本全部来自 RN 0.87.1 官方模板 / `libs.versions.toml`，与已装 SDK 全部匹配）**
+
+| 项 | 版本 | 本机状态 |
+| --- | --- | --- |
+| React Native | 0.87.1 | 待安装 |
+| React / react-dom | **19.2.3**（RN 模板精确版本，peer 允许 `^19.2.3`） | 待安装；全仓库统一此版本以避免 workspaces 出现两份 React |
+| @react-native-community/cli | 20.2.0 | 待安装 |
+| compileSdk / targetSdk | 37 / 36 | 本机 `platforms/android-37.0` ✅ **已满足，无需补装** |
+| buildToolsVersion | 37.0.0 | 本机 `build-tools/37.0.0` ✅ |
+| ndkVersion | 27.1.12297006 | 本机 `ndk/27.1.12297006` ✅ |
+| minSdk | 24 | — |
+| Gradle（wrapper） | 9.4.1 | 本机无缓存，首次构建需下载（`services.gradle.org` 直连可达） |
+| AGP / Kotlin | 9.2.1 / 2.2.0 | 经项目内代理拉取（`repo.maven.apache.org` 直连不可达） |
+| newArchEnabled / hermes | true / true | RN 0.87 模板默认 |
+
+**服务端（NestJS + SQLite）**
+
+| 包 | 版本 | 备注 |
+| --- | --- | --- |
+| @nestjs/core, common, platform-express | 12.0.4 | engines `>=20` ✅ |
+| @nestjs/cli | 12.0.3 | — |
+| @nestjs/config | 12.0.0 | — |
+| reflect-metadata / rxjs | 0.2.2 / 7.8.2 | NestJS 12 peer 要求 |
+| drizzle-orm | 0.45.3 | peer `better-sqlite3 >=7` ✅ |
+| drizzle-kit | 0.31.11 | 生成/执行 SQL migration |
+| better-sqlite3 | 13.0.3 | engines `>=22` ✅。**已核验 npm 包内自带 `prebuilds/win32-x64.node`**，且二进制含 `napi_register_module_v1`、无 `NODE_MODULE_VERSION` → N-API 跨 Node 版本 ABI 稳定，**无需本机编译、无需下载预编译包、无需 Visual Studio Build Tools** |
+| @node-rs/argon2 | 2.2.1 | Argon2id 密码哈希。采用 optionalDependencies 平台子包（`@node-rs/argon2-win32-x64-msvc@2.2.1` 已核验存在）→ 无编译。备选 `argon2@0.45.1`（prebuildify + N-API），两者均可 |
+| class-validator / class-transformer | 0.15.1 / 0.5.1 | 安装后需实测与 NestJS 12 的兼容性 |
+| @nestjs/jwt | 12.0.2 | Access Token；Refresh Token 另用哈希存储 + 轮换 |
+| @nestjs/throttler | 6.7.0 | 限流 |
+| helmet | 8.3.0 | 安全响应头 |
+| Jest / @nestjs/testing / supertest | 30.5.2 / 12.0.4 / 7.2.2 | 服务端测试 |
+
+**Web / Admin**
+
+| 包 | 版本 |
+| --- | --- |
+| vite | 8.3.0 |
+| react / react-dom | 19.2.3 |
+| vitest | 5.0.1 |
+| react-router（待定，Phase 1 用最简路由） | 最新稳定（安装时确定并记录） |
+
+**已知需在安装时验证的点（会实测并回报）**
+
+1. `class-validator@0.15.1` 与 NestJS 12 的实际兼容性。
+2. TypeScript 6.0.3 与 ESLint/`@react-native/typescript-config`/NestJS CLI 的实际协作。
+3. Jest 版本分裂：服务端 Jest 30、Android 依赖 RN 模板的 Jest 29 → npm workspaces 可能需嵌套安装；实测后若冲突，统一到单一版本并记录。
+4. RN 0.87.1 在 npm workspaces 下的 Metro 解析（需配置 `nodeModulesPaths`/hoisting 策略），Phase 1 实测。
+5. 首次 Android 构建需下载 Gradle 9.4.1 发行包与全部依赖（约数百 MB，耗时较长）。
+
+**不再需要的安装**：额外 Android SDK 平台（已匹配）、模拟器系统镜像（本轮不验证运行）、JDK 21（已证明不需要）、任何系统级构建工具（better-sqlite3/@node-rs/argon2 均有现成 N-API 产物）。
 
 ---
 
@@ -222,14 +291,21 @@ leximochi/
 ### 风险
 | 风险 | 影响 | 当前处置 |
 | --- | --- | --- |
-| Android SDK 仅 `android-37.0`，缺少常见 compileSdk 平台 | 首次 Android 构建可能失败或需下载 SDK 平台 | Phase 1 建 Android 骨架前先核验 RN/AGP 所需 compileSdk，再向用户申请 |
-| 无 AVD、无连接设备 | 无法在模拟器/真机验证 Android 端 | 需用户决定：连接真机 / 批准下载系统镜像创建 AVD / 仅做构建验证 |
-| `~/.gradle` 不存在 | 首次 Android 构建需下载 Gradle 发行包与全部依赖，耗时较长 | 网络已验证可达；预计首次构建耗时显著 |
-| 直连 `repo.maven.apache.org` 超时 | Gradle 拉取 Maven Central 依赖失败 | 见第 10 节决策点 2 |
-| 直连 `github.com`（HTTPS）超时，SSH 可用 | HTTPS 方式的 GitHub 操作受阻 | 按基线规则：优先代理 `127.0.0.1:10808`，失败则直连；本仓库 remote 为 SSH 且可用 |
-| Android Studio 要求 JDK 21，本机 JAVA_HOME 为 17 | 若 RN/AGP 新版要求 JDK 21，Gradle 构建可能失败 | Phase 1 核验后决定是否申请安装 JDK 21 |
-| Node 24 与部分工具链的兼容性 | 个别依赖可能不支持 Node 24 | Phase 1 安装依赖时实测；如冲突再评估是否需要 Node 版本管理工具（需用户批准） |
-| 文档可能随实现漂移 | 交接失真 | 每个 Phase/Task/ migration/依赖变更后更新本文件 |
+| 首次 Android 构建需下载 Gradle 9.4.1 发行包与全部依赖（`~/.gradle` 为空） | 首次构建耗时长（预计数分钟至十几分钟）、占磁盘 | 网络已验证可达；构建时使用项目内代理配置（见第 10.1 节决策 2） |
+| 无 AVD、无连接设备 | **无法在设备上运行验证** Android 端 | 已确认 Phase 1 仅做「可构建」验证；运行验证待真机或后续阶段 |
+| 直连 `repo.maven.apache.org` 超时 | 不加配置时 Gradle 拉取 Maven Central 依赖失败 | 已确认：项目内 `gradle.properties` 配置代理指向 `127.0.0.1:10808`；代理不可用时按基线回退策略处理并报告 |
+| 直连 `github.com`（HTTPS）超时，SSH 直连可用 | HTTPS 方式的 GitHub 操作受阻 | 按基线规则：优先代理 `127.0.0.1:10808`，失败则直连；本仓库 remote 为 SSH 且实测可用 |
+| 工具链版本较新（TS 6.0.3、Vite 8、NestJS 12、RN 0.87.1） | 可能出现 peer/兼容性冲突 | 已在第 10.2 节列出「安装时需实测验证」的 5 个点，会实测并回报，不擅自引入替代工具 |
+| Jest 版本分裂（服务端 30 / Android 29） | npm workspaces 下可能需嵌套安装或产生 hoisting 冲突 | 安装时实测；如冲突则统一版本并记录 |
+| RN 在 npm workspaces 下的 Metro 解析 | Android 打包可能找不到模块 | Phase 1 建 Android 骨架时实测并记录所需 Metro 配置 |
+| Node 24 与部分工具链的兼容性 | 个别依赖可能不支持 Node 24（RN engines 明确支持 `^24.3.0`） | 安装依赖时实测；如冲突再评估，需用户批准才安装版本管理工具 |
+| 文档可能随实现漂移 | 交接失真 | 每个 Phase/Task/migration/依赖变更后更新本文件 |
+
+### 已消除的风险（原第 11 节条目，经核验后关闭）
+- ~~Android SDK 缺少 compileSdk 平台~~：RN 0.87.1 要求 compileSdk 37 / buildTools 37.0.0 / NDK 27.1.12297006，**与本机已装组件完全一致，无需补装任何 SDK 组件**。
+- ~~AGP 可能要求 JDK 21~~：已反汇编确认 AGP 9.2.1 正常路径最低要求为 **JDK 17**。
+- ~~better-sqlite3 可能需本机编译（需 VS Build Tools）~~：已核验包内自带 `prebuilds/win32-x64.node` 且为 N-API。
+- ~~Argon2 可能需本机编译~~：`@node-rs/argon2` 使用平台子包，无编译。
 
 ### 阻塞项
 - 无硬阻塞。**当前等待用户批准 Phase 1 计划后再进入正式开发**（按基线「现在的执行顺序」要求）。
@@ -283,8 +359,8 @@ leximochi/
 
 ## 16. 下一步任务优先级
 
-1. **等待用户批准** Phase 1 计划与第 10 节 5 个待决策点。
-2. 用户批准后，按顺序推进 Phase 1：
+1. **等待用户确认第 10.2 节的依赖版本清单**（确认后才安装依赖并开始建项目）。
+2. 用户确认后，按顺序推进 Phase 1：
    a. 架构方案 + 目录规划 + 初始数据库 ER 设计 + Phase 1 实施计划与验收标准（文档化到 `docs/`）。
    b. Monorepo 地基：根 `package.json`（npm workspaces）、`.gitignore`、`.env.example`、`README.md`、TS 基础配置、lint/format/测试脚手架。
    c. `apps/server`：NestJS 骨架 + SQLite(WAL/busy_timeout/外键) + ORM 选型落地 + migration 机制 + 配置与秘密加载校验。
