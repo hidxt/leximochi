@@ -1,0 +1,9 @@
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 24;
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+export const RECOVERY_CODE_COUNT = 10;
+export const RECOVERY_CODE_GROUP_COUNT = 3;
+export const RECOVERY_CODE_GROUP_LENGTH = 4;
+export const REFRESH_TOKEN_COOKIE_NAME = 'leximochi_rt';
+export const MOBILE_CLIENT_HEADER = 'x-client-type';

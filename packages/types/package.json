@@ -5,8 +5,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
     "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.13",
+    "@types/node": "^24.0.0",
+    "jest": "30.5.2",
+    "ts-jest": "^29.4.12"
   }
 }
