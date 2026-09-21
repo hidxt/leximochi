@@ -162,8 +162,9 @@ Expected: FAIL（根 `package.json` 尚不存在，读取失败）
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
-    "module": "CommonJS",
-    "moduleResolution": "Node10",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "isolatedModules": true,
     "strict": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
@@ -712,7 +713,7 @@ describe('generateRecoveryCodes', () => {
 
 describe('normalizeRecoveryCode', () => {
   it('忽略大小写、空格与连字符', () => {
-    expect(normalizeRecoveryCode(' abcd-efgh ijkl ')).toBe('ABCDEFGHIJKL');
+    expect(normalizeRecoveryCode(' abcd-efgh jkmn ')).toBe('ABCDEFGHJKMN');
   });
 
   it('映射易混字符', () => {
@@ -795,11 +796,12 @@ export function validatePassword(
 ): ValidationResult {
   if (password.length < policy.minLength) return { ok: false, reason: 'password_too_short' };
   if (password.length > policy.maxLength) return { ok: false, reason: 'password_too_long' };
+  const lowered = password.toLowerCase();
+  // 先判常见弱密码：这类密码通常也属于字符类别不足，但「过于常见」对用户更有指导意义
+  if (COMMON_PASSWORDS.has(lowered)) return { ok: false, reason: 'password_too_common' };
   if (countCharacterClasses(password) < policy.minCharacterClasses) {
     return { ok: false, reason: 'password_not_complex_enough' };
   }
-  const lowered = password.toLowerCase();
-  if (COMMON_PASSWORDS.has(lowered)) return { ok: false, reason: 'password_too_common' };
   if (ctx.username) {
     const canonical = normalizeUsername(ctx.username);
     if (canonical.length >= 3 && lowered.includes(canonical)) {
@@ -1136,8 +1138,9 @@ Expected: FAIL，`Cannot find module '../src/config/configuration'`
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node10",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "isolatedModules": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "rootDir": ".",
@@ -5382,5 +5385,22 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 - 听力、AI 口语、勋章与通知、离线同步、完整后台其余模块（Phase 4–7）。
 
 以上推迟项必须在 `docs/phase-1-acceptance.md` 与 `HANDOFF.md` 中显式列出，不得含糊。
+
+---
+
+## 实施偏差记录（Implementation Deviations）
+
+执行过程中与计划不同的地方，按「计划 → 实际 → 原因 → 证据」记录。文档与代码不一致时以代码为准，并回填本节。
+
+| # | 计划 | 实际 | 原因与证据 |
+| --- | --- | --- | --- |
+| D1 | `tsconfig.base.json` 用 `module: CommonJS` + `moduleResolution: Node10` | 改为 `module: Node16` + `moduleResolution: Node16` + `isolatedModules: true` | TypeScript 6.0.3 已弃用 node10，实测报 `TS5107`（`npm run typecheck` 输出）；ts-jest 另要求 hybrid module 配置 `isolatedModules` |
+| D2 | 共享包 `build` 直接 `tsc -p tsconfig.json` | 新增 `tsconfig.build.json`（`exclude: **/*.spec.ts`），`build` 指向它 | 测试文件位于 `src/`，直接以 `tsconfig.json` 构建会把 `*.spec.ts` 一起产出到 `dist/`；同时各包 `tsconfig.json` 需 `types: ["node","jest"]` 才能让 typecheck 识别 jest 全局 |
+| D3 | 根 `build`/`test` 直接 `--workspaces` | 新增 `build:packages` 先按依赖顺序构建 `types → shared → core` | `npm --workspaces` 的执行顺序是 glob 顺序（apps 在前），会导致 `core` 在 `types` 之前构建而失败 |
+| D4 | `normalizeRecoveryCode(' abcd-efgh ijkl ')` 期望 `ABCDEFGHIJKL` | 期望值改为 `normalizeRecoveryCode(' abcd-efgh jkmn ') === 'ABCDEFGHJKMN'` | 原计划两条用例互相矛盾：Crockford 易混字符映射要求 `I→1`、`L→1`，与「保留 IJKL」冲突。保留映射（生成的字表本就不含 I/L/O/U，映射仅帮助用户纠正误抄），修正该用例输入 |
+| D5 | `validatePassword` 先判字符类别、后判常见弱密码 | 顺序改为**先判常见弱密码** | `password1234` 字符类别不足，原顺序会返回 `password_not_complex_enough`，与用例期望的 `password_too_common` 不符；先判常见弱密码对用户更有指导意义 |
+| D6 | `ts-jest` 用 `^29.2.0` | 用 `^29.4.12` | 仅 29.4.x 声明支持 jest 30 与 TypeScript <7（`npm view ts-jest peerDependencies`） |
+| D7 | 计划未提及 npm 安装脚本策略 | 记录：npm 11 默认拦截依赖的 postinstall 脚本（实测提示 `unrs-resolver@1.12.2 (postinstall)` 被忽略） | 属 npm 11 的安全默认行为，与安全红线一致；当前依赖链不需要构建脚本（better-sqlite3/@node-rs 均自带预编译产物） |
+
 
 

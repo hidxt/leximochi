@@ -7,10 +7,11 @@
   "workspaces": ["apps/*", "packages/*"],
   "engines": { "node": ">=24.3.0" },
   "scripts": {
+    "build:packages": "npm run build -w @leximochi/types && npm run build -w @leximochi/shared && npm run build -w @leximochi/core",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "build": "npm run build:packages && npm run build --workspaces --if-present",
     "verify:workspaces": "node scripts/verify-workspaces.mjs"
   },
   "devDependencies": {
