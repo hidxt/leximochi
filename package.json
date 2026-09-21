@@ -1,0 +1,23 @@
+{
+  "name": "leximochi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gamified English learning with vocabulary, AI speaking, listening practice, and a virtual pet companion.",
+  "license": "Apache-2.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=24.3.0" },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "verify:workspaces": "node scripts/verify-workspaces.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.0.0"
+  }
+}
