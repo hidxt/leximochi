@@ -4,8 +4,10 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { CsrfOriginGuard } from './common/guards/csrf-origin.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
+import { AuditModule } from './modules/audit/audit.module';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -13,6 +15,8 @@ import { HealthModule } from './modules/health/health.module';
     AppConfigModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     DatabaseModule,
+    AuditModule,
+    AuthModule,
     HealthModule,
   ],
   providers: [

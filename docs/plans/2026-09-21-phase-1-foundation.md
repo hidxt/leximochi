@@ -5409,6 +5409,10 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 | D13 | 计划按 better-sqlite3 旧版 API 读取 PRAGMA 标量 | 新增 `readPragma()` 归一化：v13 的 `pragma()` 返回**行数组**（如 `[{"journal_mode":"wal"}]`），且 `busy_timeout` 的键名是 `timeout`；启动时新增 `busy_timeout=5000` 与外键生效断言 | 实测 `pragma('journal_mode')` 返回 `[{"journal_mode":"wal"}]`，直接 `String()` 得到 `[object Object]`，导致 WAL 断言误判 |
 | D14 | `users.banned_by` 用内联 `references(() => users.id)` | 改为在表约束中用 `foreignKey({ name: 'users_banned_by_fk', ... }).onDelete('set null')` | 自引用导致 TS 循环推断：`TS7022 'users' implicitly has type 'any'`、`TS7024`。迁移文件已重新生成为单一 `0000_*.sql`（尚未发布，未违反「已发布迁移不可改」） |
 | D15 | 未指定 migration 产物目录的清理策略 | schema 调整后删除 `drizzle/` 并重新生成，保证 Phase 1 只留下一个干净的首版迁移 | 避免在未发布的同一阶段堆叠修补型迁移（`0000` + `0001`） |
+| D16 | 验证码直接使用 `req.ip` 绑定 | 新增 `common/net/ip.ts` 的 `normalizeIp()`，把 IPv4-mapped IPv6（`::ffff:127.0.0.1`）归一为 IPv4，签发与校验两侧都使用 | 实测注册返回 400：测试以 `127.0.0.1` 签发，服务端看到 `::ffff:127.0.0.1`，绑定不一致。该归一化同时避免同一客户端在限流计数中被算作两个来源 |
+| D17 | 测试用 `app.get(ChallengeCaptchaProvider)` 取验证码 Provider | 改为 `app.get<ChallengeCaptchaProvider>(CAPTCHA_PROVIDER)` | 该 Provider 以令牌 `CAPTCHA_PROVIDER` 通过 `useFactory` 注册，类本身不是 Provider（实测 `Nest could not find ChallengeCaptchaProvider element`） |
+| D18 | 用 `Algorithm.Argon2id` 指定算法 | 改用数值 `2`（附注释） | `@node-rs/argon2` 的 `Algorithm` 是 ambient const enum，`isolatedModules: true` 下不可访问（实测 `TS2748`） |
+| D19 | `RoleRepository` 含 `canAssignRole` | Phase 1 未实现该方法（无调用方），改为在 Drizzle 实现中提供 `hasRole` 供后续权限管理使用 | 避免出现无调用方的接口方法（YAGNI）；如后续需要角色授予权限校验再补 |
 
 
 
