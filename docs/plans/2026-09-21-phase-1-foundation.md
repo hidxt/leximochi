@@ -5401,6 +5401,10 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 | D5 | `validatePassword` 先判字符类别、后判常见弱密码 | 顺序改为**先判常见弱密码** | `password1234` 字符类别不足，原顺序会返回 `password_not_complex_enough`，与用例期望的 `password_too_common` 不符；先判常见弱密码对用户更有指导意义 |
 | D6 | `ts-jest` 用 `^29.2.0` | 用 `^29.4.12` | 仅 29.4.x 声明支持 jest 30 与 TypeScript <7（`npm view ts-jest peerDependencies`） |
 | D7 | 计划未提及 npm 安装脚本策略 | 记录：npm 11 默认拦截依赖的 postinstall 脚本（实测提示 `unrs-resolver@1.12.2 (postinstall)` 被忽略） | 属 npm 11 的安全默认行为，与安全红线一致；当前依赖链不需要构建脚本（better-sqlite3/@node-rs 均自带预编译产物） |
+| D8 | 计划假定 NestJS 为 CommonJS | **NestJS 12 全系包为 ESM-only**（`@nestjs/common`、`core`、`platform-express`、`jwt` 的 package.json 均为 `"type": "module"`）。服务端仍以 CommonJS 产出（tsconfig `module: NodeNext` 且 apps/server 无 `type: module`），依赖 **Node 24 原生 `require(esm)`** 加载 Nest 包；Jest 必须用 `node --experimental-vm-modules …/jest.js` 运行 | 证据：不带 flag 时 `createRequireEsmError`（`@nestjs/testing/index.js` 为 ESM）；带 flag 后 2 个 suite / 8 个用例通过；`require('@nestjs/testing')` 在 Node 24.19 下直接可用。做法与 Nest 12 官方 TypeScript 模板一致（模板 test 脚本即 `node --experimental-vm-modules ./node_modules/jest/bin/jest.js`），其 tsconfig 亦为 `module: nodenext` |
+| D9 | 计划未指定 `.env` 加载方式（原依赖清单含 `@nestjs/config`） | 不加 dotenv/@nestjs/config，改用 Node 24 原生 `node --env-file-if-exists=.env`（`start`/`start:dev` 脚本） | 减少一个依赖（供应链更小）；进程已有环境变量优先，符合部署直觉；生产可为 `.env` 设置严格文件权限 |
+| D10 | 计划 `test` 直接用 `jest` | 改为 `node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand` | jest 被 npm workspaces 提升到根 `node_modules`，`apps/server/node_modules/jest` 不存在（实测 `Cannot find module`） |
+| D11 | 计划未包含 `.env` 本地生成 | 本地开发 `.env` 用脚本生成随机 32 字节密钥（仅本地、已被 `.gitignore` 忽略） | 实测：直接复制 `.env.example` 会因占位秘密而**拒绝启动**（`配置校验失败: 环境变量 JWT_SECRET 长度不足 32 或仍为占位值`，退出码 1），属预期的安全行为 |
 
 
 
