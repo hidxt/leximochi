@@ -94,6 +94,29 @@ describe('createSessionManager', () => {
     expect(events).toEqual(['anonymous']);
   });
 
+
+  it('并发与重复 restore 都只发起一次 refresh（避免轮换触发复用检测）', async () => {
+    const store = createMemorySessionStore();
+    store.setTokens({ accessToken: 'old', refreshToken: 'r1', expiresIn: 900 });
+    const client = fakeClient();
+    const manager = createSessionManager({ client, store });
+
+    await Promise.all([manager.restore(), manager.restore()]);
+    // 串行再次调用（React 严格模式的双次效应）也不应产生第二次 refresh
+    await manager.restore();
+    expect(client.auth.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('登出后再次 restore 会重新发起 refresh', async () => {
+    const store = createMemorySessionStore();
+    const client = fakeClient();
+    const manager = createSessionManager({ client, store });
+    await manager.restore();
+    await manager.logout();
+    await manager.restore();
+    expect(client.auth.refresh).toHaveBeenCalledTimes(2);
+  });
+
   it('登录后调用 refresh 不会覆盖已知用户', async () => {
     const store = createMemorySessionStore();
     const manager = createSessionManager({ client: fakeClient(), store });

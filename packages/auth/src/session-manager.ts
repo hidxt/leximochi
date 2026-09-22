@@ -20,6 +20,8 @@ export interface SessionManagerOptions {
   client: SessionClient;
   store: SessionStore;
   onSessionChange?: (state: SessionState, user: PublicUser | null) => void;
+  /** 复用检测是严格策略：并发刷新会让旧 token 被判定为泄漏，因此刷新必须单飞 */
+  retryDelayMs?: number;
 }
 
 export interface SessionManager {
@@ -31,11 +33,61 @@ export interface SessionManager {
 }
 
 export function createSessionManager(options: SessionManagerOptions): SessionManager {
+  const retryDelayMs = options.retryDelayMs ?? 300;
   let currentUser: PublicUser | null = null;
   let permissions: string[] = [];
+  let restorePromise: Promise<PublicUser | null> | null = null;
 
   function emit(state: SessionState): void {
     options.onSessionChange?.(state, currentUser);
+  }
+
+  function resetLocalState(): void {
+    options.store.clear();
+    currentUser = null;
+    permissions = [];
+  }
+
+  /**
+   * 刷新会轮换 token 并撤销上一个会话，因此「同一次会话恢复」只能发生一次：
+   * 记忆化整个 restore（刷新 + 取用户信息），保证 React 严格模式的双次效应、
+   * 重复挂载或并发调用都只产生一次 refresh。
+   */
+  async function doRestore(): Promise<PublicUser | null> {
+    try {
+      await refresh();
+    } catch {
+      // 另一个标签页可能刚轮换并写入新 Cookie，短暂等待后重试一次
+      await delay(retryDelayMs);
+      try {
+        await refresh();
+      } catch {
+        resetLocalState();
+        emit('anonymous');
+        return null;
+      }
+    }
+
+    try {
+      const me = await options.client.auth.me();
+      currentUser = me.user;
+      permissions = me.permissions;
+      emit('authenticated');
+      return currentUser;
+    } catch {
+      resetLocalState();
+      emit('anonymous');
+      return null;
+    }
+  }
+
+  function refresh(): Promise<void> {
+    const refreshToken = options.store.getRefreshToken();
+    return options.client.auth
+      .refresh(refreshToken ? { refreshToken } : undefined)
+      .then((refreshed) => {
+        options.store.setTokens(refreshed);
+      });
   }
 
   return {
@@ -51,29 +103,16 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       const result = await options.client.auth.login(input);
       options.store.setTokens(result);
       currentUser = result.user;
+      restorePromise = Promise.resolve(result.user);
       emit('authenticated');
       return result.user;
     },
 
-    async restore(): Promise<PublicUser | null> {
-      const refreshToken = options.store.getRefreshToken();
-      try {
-        const refreshed = await options.client.auth.refresh(
-          refreshToken ? { refreshToken } : undefined,
-        );
-        options.store.setTokens(refreshed);
-        const me = await options.client.auth.me();
-        currentUser = me.user;
-        permissions = me.permissions;
-        emit('authenticated');
-        return currentUser;
-      } catch {
-        options.store.clear();
-        currentUser = null;
-        permissions = [];
-        emit('anonymous');
-        return null;
+    restore(): Promise<PublicUser | null> {
+      if (!restorePromise) {
+        restorePromise = doRestore();
       }
+      return restorePromise;
     },
 
     async logout(): Promise<void> {
@@ -83,10 +122,13 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       } catch {
         // 服务端登出失败也要清空本地凭证，避免界面停留在已登录状态
       }
-      options.store.clear();
-      currentUser = null;
-      permissions = [];
+      resetLocalState();
+      restorePromise = null;
       emit('anonymous');
     },
   };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
