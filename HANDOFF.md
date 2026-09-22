@@ -6,7 +6,7 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-22
-- 当前阶段：**Phase 1 执行中**（15 个任务中已完成 7 个：Monorepo / 共享包 / 服务端地基 / 数据库 / 注册 / 登录与会话）
+- 当前阶段：**Phase 1 执行中**（15 个任务中已完成 11 个：Monorepo / 共享包 / 服务端地基 / 数据库 / 注册 / 登录与会话 / 恢复码 / 限流与锁定 / RBAC 与后台接口 / API SDK）
 - 当前可运行端：**仅服务端**（Web / Admin / Android 尚未创建）
 
 ---
@@ -27,8 +27,8 @@
 | 仓库根目录 | `C:\Users\auzasr\Documents\Projects\leximochi`（唯一项目目录） |
 | 当前分支 | `main` |
 | 上游 | `origin/main`（`git@github.com:hidxt/leximochi.git`，SSH） |
-| 最近 commit | `ce53d73 feat(auth): 实现登录、Refresh 轮换与设备会话管理` |
-| 之前 commit | `b5ca547`（注册）→ `f94a7bf`（数据库）→ `4a96e7d`（服务端骨架）→ `16097b3`（types）→ `0904604`（Monorepo）→ `6689da0`（架构与计划）→ `7368587`（决策与版本清单）→ `714fac7`（安全红线与交接）→ `8649e27`（初始） |
+| 最近 commit | `2b3dba5 feat(api-client,auth): 实现类型安全 HTTP 客户端与会话管理器` |
+| 之前 commit | `4919082`（RBAC 与后台）→ `8d33d5d`（限流）→ `055ea23`（恢复码）→ `ce53d73`（登录与会话）→ `b5ca547`（注册）→ `f94a7bf`（数据库）→ `4a96e7d`（服务端骨架）→ `16097b3`（types）→ `0904604`（Monorepo）→ `6689da0`（架构与计划）→ `7368587`（决策与版本清单）→ `714fac7`（安全红线与交接）→ `8649e27`（初始） |
 | 工作区 | 干净（`git status` 无未提交改动） |
 | 远端 | **未 push**（本地领先 `origin/main` 8 个 commit，是否推送由用户决定） |
 | 许可证 | Apache-2.0（`LICENSE`） |
@@ -54,7 +54,9 @@ leximochi/
 ├── packages/
 │   ├── types/                      # 错误码、权限键、限额、认证 DTO 契约
 │   ├── core/                       # 用户名/密码/恢复码纯规则
-│   └── shared/                     # 设计 Token
+│   ├── shared/                     # 设计 Token
+│   ├── api-client/                 # 类型安全 HTTP 客户端（auth/admin 端点 + ApiError）
+│   └── auth/                       # 会话状态机与 SessionStore 抽象
 ├── docs/                           # architecture.md、database-design.md、plans/
 ├── scripts/verify-workspaces.mjs
 ├── package.json / tsconfig.base.json / eslint.config.mjs
@@ -118,34 +120,36 @@ leximochi/
 
 | 端 | 状态 |
 | --- | --- |
-| `apps/server` | ✅ 可运行：`npm run build -w @leximochi/server` 后 `node --env-file-if-exists=.env dist/main.js`；实测 `/health` 200、404 统一错误格式、helmet 安全头齐全、自动建库并生成 WAL |
+| `apps/server` | ✅ 可运行：`npm run build -w @leximochi/server` 后 `node --env-file-if-exists=.env dist/main.js`；实测 `/health` 200、404 统一错误格式、helmet 安全头齐全、自动建库并生成 WAL；另实测 `create-admin` 脚本三条路径 |
 | `apps/web` | ❌ 未创建（计划 Task 12） |
 | `apps/admin` | ❌ 未创建（计划 Task 13） |
 | `apps/mobile` | ❌ 未创建（计划 Task 14） |
-| `packages/api-client`、`packages/auth` | ❌ 未创建（计划 Task 11） |
+| `packages/api-client`、`packages/auth` | ✅ 已实现并有单测（分别为 7、5 个用例）；尚未被任何前端消费 |
 
 ---
 
 ## 8. 已完成 / 进行中 / 未完成
 
-### 已完成（对应计划 Task 1–7）
+### 已完成（对应计划 Task 1–11）
 - Monorepo 地基：npm workspaces、TS 6 基座、ESLint/Prettier、`.gitignore`/`.gitattributes`/`.env.example`、workspaces 校验脚本、README。
 - `@leximochi/types`（错误码/权限/限额/DTO 契约）、`@leximochi/core`（用户名/密码/恢复码规则）、`@leximochi/shared`（设计 Token）。
 - 服务端骨架：启动期配置校验（缺失/过短/占位秘密 → 拒绝启动）、统一错误响应（不泄露堆栈/路径）、helmet、CORS 白名单、CSRF Origin 校验、请求 ID、`/health`。
 - 数据库层：10 张表 schema、首版迁移、WAL/busy_timeout/外键断言、仓储接口 + Drizzle 实现、事务辅助、审计服务。
 - 注册：验证码抽象与实现、Argon2id、恢复码哈希入库、失败补偿、审计。
 - 登录与 Token：JWT access token、refresh 轮换与复用检测、登出/退出全部设备/设备会话管理、全局认证守卫（权限每请求读库）。
+- 恢复码：`/auth/recovery` 一次性重置密码（先校验密码强度再消费恢复码、成功后撤销全部会话并整组重发、条件更新防重放）。
+- 限流与锁定：登录按用户名与 IP 双维度计数、注册/恢复码/验证码分别限流、达阈值 429 + 审计。
+- RBAC 与后台：`PermissionsGuard` + `/admin/users`（检索/分页/封禁/解封）+ `/admin/audit-logs` + `create-admin` 脚本。
+- API SDK：`@leximochi/api-client`（ApiError 解包、鉴权头、401 回调）与 `@leximochi/auth`（会话状态机）。
 
 ### 进行中
-- 计划 Task 8 起：恢复码流程（`/auth/recovery`）、限流与暴力破解锁定、RBAC 与后台接口、API SDK、三端骨架、验收。
+- 计划 Task 12 起：三端骨架与验收。
 
 ### 未完成（Phase 1 剩余）
-1. `/auth/recovery` 一次性恢复码重置密码 + 全会话撤销。
-2. 限流与暴力破解锁定（`auth_attempts` 已建表，尚未接入服务）。
-3. RBAC 权限守卫 + `/admin/*`（用户查询、封禁/解封、审计查询）+ 管理员初始化脚本。
-4. `packages/api-client`、`packages/auth`。
-5. `apps/web`、`apps/admin`、`apps/mobile`。
-6. Phase 1 验收报告（`docs/phase-1-acceptance.md`）、`docs/api.md`、发布前安全自检。
+1. `apps/web`（注册/登录/受保护首页/设备会话管理）。
+2. `apps/admin`（管理员登录、用户列表、封禁二次确认、审计日志）。
+3. `apps/mobile`（RN 0.87.1 登录界面、Metro monorepo 配置、Gradle 代理、APK 构建验证）。
+4. Phase 1 验收报告（`docs/phase-1-acceptance.md`）、`docs/api.md`、发布前安全自检。
 
 ### Phase 2–7
 全部未开始（词库与复习、宠物闭环、听力、AI 口语、勋章、离线同步与发布）。
@@ -160,14 +164,15 @@ leximochi/
 | `npm install` | 成功（root + 全部 workspace） |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | exit 0：服务端 47、core 15、types 3（合计 65 个用例） |
+| `npm test` | exit 0：服务端 77、core 15、api-client 7、auth 5、types 3（合计 **107 个用例**） |
 | `npm run build` | exit 0 |
 
 ### 服务端专项
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 8 suites / 47 tests 全通过（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2） |
+| `npm test -w @leximochi/server` | 13 suites / 77 tests 全通过（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |
 | 启动实测（占位秘密） | **拒绝启动**：`配置校验失败: 环境变量 JWT_SECRET 长度不足 32 或仍为占位值`，退出码 1，日志不含秘密值 |
@@ -259,12 +264,10 @@ leximochi/
 
 ## 16. 下一步任务优先级
 
-1. **计划 Task 8**：`/auth/recovery` 一次性恢复码（先校验新密码强度再消费恢复码；成功后撤销全部会话并整组重发恢复码）。
-2. **计划 Task 9**：限流与暴力破解锁定（`auth_attempts` 计数、按用户名与 IP 双维度、锁定写审计）。
-3. **计划 Task 10**：`PermissionsGuard` + `/admin/*`（用户查询、封禁/解封、审计查询）+ `create-admin` 脚本。
-4. **计划 Task 11**：`packages/api-client` + `packages/auth`。
-5. **计划 Task 12–14**：`apps/web` → `apps/admin` → `apps/mobile`（含 Gradle 代理配置与 APK 构建验证）。
-6. **计划 Task 15**：全量验收、安全自检、`docs/phase-1-acceptance.md`、`docs/api.md`、本文件最终更新。
+1. **计划 Task 12**：`apps/web`（Vite + React 19.2.3；注册/登录/受保护首页/设备会话管理；使用 `design-tokens` 与 frontend-design 规范，不建空占位页）。
+2. **计划 Task 13**：`apps/admin`（独立后台：管理员登录、用户检索、封禁二次确认、审计日志；端口 5174）。
+3. **计划 Task 14**：`apps/mobile`（RN 0.87.1：登录界面、Metro monorepo 配置、`gradle.properties` 项目内代理、`assembleDebug` 产出 APK）。
+4. **计划 Task 15**：全量验收、安全自检、`docs/phase-1-acceptance.md`、`docs/api.md`、本文件最终更新。
 
 执行每一步时请对照 `docs/plans/2026-09-21-phase-1-foundation.md` 的任务步骤与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。
 
