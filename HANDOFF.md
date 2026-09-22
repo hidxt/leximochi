@@ -6,8 +6,8 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-22
-- 当前阶段：**Phase 1 执行中**（15 个任务中已完成 11 个：Monorepo / 共享包 / 服务端地基 / 数据库 / 注册 / 登录与会话 / 恢复码 / 限流与锁定 / RBAC 与后台接口 / API SDK）
-- 当前可运行端：**仅服务端**（Web / Admin / Android 尚未创建）
+- 当前阶段：**Phase 1 全部 15 个任务的实现已完成**（含四端与验收文档），等待用户确认是否进入 Phase 2
+- 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）
 
 ---
 
@@ -121,9 +121,9 @@ leximochi/
 | 端 | 状态 |
 | --- | --- |
 | `apps/server` | ✅ 可运行：`npm run build -w @leximochi/server` 后 `node --env-file-if-exists=.env dist/main.js`；实测 `/health` 200、404 统一错误格式、helmet 安全头齐全、自动建库并生成 WAL；另实测 `create-admin` 脚本三条路径 |
-| `apps/web` | ❌ 未创建（计划 Task 12） |
-| `apps/admin` | ❌ 未创建（计划 Task 13） |
-| `apps/mobile` | ❌ 未创建（计划 Task 14） |
+| `apps/web` | ✅ 可运行：`npm run dev -w @leximochi/web`（5173）；已实测注册（含恢复码保存确认）→ 登录 → 刷新恢复会话 → 登出，控制台无错误 |
+| `apps/admin` | ✅ 可运行：`npm run dev -w @leximochi/admin`（5174）；已实测管理员登录、用户检索、封禁（二次确认+原因）、审计日志、非管理员被拒 |
+| `apps/mobile` | ✅ 可构建：`npm run build:android -w @leximochi/mobile` → `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`（约 117 MB，含 4 ABI）。**未做运行验证**（本机无 AVD / 无真机） |
 | `packages/api-client`、`packages/auth` | ✅ 已实现并有单测（分别为 7、5 个用例）；尚未被任何前端消费 |
 
 ---
@@ -206,6 +206,9 @@ leximochi/
 ### Bug
 - 无已知功能缺陷（当前实现全部有测试覆盖且通过）。
 
+### 待用户决定
+- **Android 调试密钥 `apps/mobile/android/app/debug.keystore` 未入库**。RN 模板默认提交该文件（`storePassword/keyPassword` 均为公开的 `android`，仅用于 debug 签名，非真实秘密），但本项目红线 `SECURITY-GUARDRAILS.md` 明确禁止提交任何 `*.keystore`。当前处理：**不入库**，已在 `apps/mobile/.gitignore` 注释里写明生成命令（保证新克隆可复现构建）。若你更倾向于沿用 RN 约定直接提交该公开调试密钥，请告知，我会改为显式例外并在安全红线中注明理由。
+
 ### 技术债
 1. `ChallengeCaptchaProvider` 的「已消费挑战」用**进程内 Set** 记录，多实例部署会失效（表 `captcha_challenges` 已建好，届时改用它）。
 2. `req.ip` 直接使用；**部署到反向代理后必须配置 `trust proxy`**，否则限流与验证码绑定会以代理 IP 为准（Phase 7 部署文档需写清）。
@@ -266,7 +269,7 @@ leximochi/
 
 1. **计划 Task 12**：`apps/web`（Vite + React 19.2.3；注册/登录/受保护首页/设备会话管理；使用 `design-tokens` 与 frontend-design 规范，不建空占位页）。
 2. **计划 Task 13**：`apps/admin`（独立后台：管理员登录、用户检索、封禁二次确认、审计日志；端口 5174）。
-3. **计划 Task 14**：`apps/mobile`（RN 0.87.1：登录界面、Metro monorepo 配置、`gradle.properties` 项目内代理、`assembleDebug` 产出 APK）。
+3. ~~计划 Task 14~~ ✅：`apps/mobile` 完成 RN 0.87.1 初始化、workspace 改造、Metro monorepo 配置、Gradle 项目内代理与两处 monorepo 路径适配；`assembleDebug` 成功产出 APK。
 4. **计划 Task 15**：全量验收、安全自检、`docs/phase-1-acceptance.md`、`docs/api.md`、本文件最终更新。
 
 执行每一步时请对照 `docs/plans/2026-09-21-phase-1-foundation.md` 的任务步骤与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。

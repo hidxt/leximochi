@@ -1,0 +1,23 @@
+// npm workspaces 会把 react-native 的传递依赖提升到仓库根 node_modules，
+// 因此 gradle-plugin 可能在本地或仓库根。
+// 注意：Gradle 要求 plugins {} 之前只能出现 buildscript/pluginManagement/plugins 块，
+// 所以解析逻辑必须写在 pluginManagement 内部；且 includeBuild 传相对路径字符串。
+pluginManagement {
+    def localPlugin = '../node_modules/@react-native/gradle-plugin'
+    def hoistedPlugin = '../../../node_modules/@react-native/gradle-plugin'
+    def pluginPath = file(localPlugin).exists() ? localPlugin : hoistedPlugin
+    if (!file(pluginPath).exists()) {
+        throw new GradleException('CRITICAL: 未找到 @react-native/gradle-plugin，请先在仓库根执行 npm install')
+    }
+    includeBuild(pluginPath)
+}
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'LeximochiMobile'
+include ':app'
+
+def reactNativeGradlePluginPath =
+    file('../node_modules/@react-native/gradle-plugin').exists()
+        ? '../node_modules/@react-native/gradle-plugin'
+        : '../../../node_modules/@react-native/gradle-plugin'
+includeBuild(reactNativeGradlePluginPath)

@@ -5418,6 +5418,10 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 | D22 | 未明确引导管理员的恢复码 | 引导管理员**不生成恢复码**，脚本会打印提示 | 保持脚本简单且不把任何凭证写入终端输出；替代路径：先用注册流程创建账号再由后台授予 admin。已记入 `HANDOFF.md` 技术债 |
 | D23 | 计划含 `endpoints/user.endpoints.ts`（调用 `/users/me`） | **删除该文件**，`ApiClient` 只暴露 `health`/`auth`/`admin` | 服务端并不存在 `/users/me` 端点，保留即为「指向不存在接口的死代码」；Phase 2 需要时再按真实端点添加 |
 | D24 | `packages/auth` 依赖 `@leximochi/api-client` | 去掉该依赖，只依赖 `@leximochi/types`（通过 `SessionClient` 结构化接口解耦） | 会话管理器只依赖接口契约，不依赖具体客户端实现；这样 Web/Admin/Mobile 可注入各自客户端，也避免多余依赖 |
+| D25 | 计划假定 RN 的 Android 构建开箱可用 | 两处适配：(1) `android/settings.gradle` 的 `@react-native/gradle-plugin` 在本地与仓库根两处查找（逻辑需写在 `pluginManagement` 内，`includeBuild` 传相对路径字符串）；(2) `android/app/build.gradle` 的 `react {}` 块显式设置 `root`/`reactNativeDir`/`codegenDir`/`cliFile` 指向仓库根 | 实测两轮失败：先 `Included build 'apps/mobile/node_modules/@react-native/gradle-plugin' does not exist`，再 `Failed to apply plugin 'com.facebook.react.rootproject' … react-native/ReactAndroid/gradle.properties（找不到路径）`。根因都是 npm workspaces 把 react-native 及其传递依赖提升到仓库根。修好后 `assembleDebug` 成功（20m16s，产出 app-debug.apk） |
+| D26 | 计划按旧版 RN API 使用 `StatusBar backgroundColor` | 去掉该属性（保留 `barStyle`） | RN 0.87 起 Android 强制边到边显示，该属性已从类型中移除（实测 `TS2769`） |
+| D27 | 未记录 npm 对 `better-sqlite3` 安装脚本的处理 | 记录：npm 11 拦截了 `better-sqlite3@13.0.3 (install: node-gyp rebuild)`，但服务端测试与真实启动均正常 | 该包自带 N-API 预编译产物，无需 node-gyp 构建；被拦截的脚本未影响功能（73 个服务端用例与 WAL 实测均通过） |
+| D28 | 未指定移动端端口/网络地址约定 | 移动端 `API_BASE_URL` 固定为 `http://10.0.2.2:3100`（模拟器访问宿主机），真机需改局域网 IP；Web/Admin 用 `VITE_API_BASE_URL`（默认 `http://localhost:3100`），**不使用 Vite 代理** | 服务端 refresh Cookie 的 path 为 `/auth`，经 Vite 代理会被浏览器视为 `/api/auth` 而不发送该 Cookie；直连 API 源则 Cookie 与 CORS 均按设计工作（实测通过） |
 
 
 
