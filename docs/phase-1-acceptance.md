@@ -112,7 +112,10 @@
 
 ### 3.1 依赖审计
 
-- `npm audit --omit=dev` 结果见 `HANDOFF.md` 记录；如存在告警会在该处给出处置结论。
+- 命令：`npm audit --omit=dev --registry=https://registry.npmjs.org/`
+  结果：**`found 0 vulnerabilities`（exit 0）**。
+  说明：本机默认 registry 为 `registry.npmmirror.com`，该镜像未实现 audit 接口（返回 `NOT_IMPLEMENTED`），因此仅对本次命令使用官方 registry，**未修改任何全局或项目 npm 配置**。
+- 审计覆盖生产依赖（`--omit=dev`）；开发依赖的告警不进入运行时。
 - npm 11 默认**拦截依赖的 install/postinstall 脚本**（实测拦截 `better-sqlite3` 的 `node-gyp rebuild`、`esbuild`、`unrs-resolver`）。当前依赖链不需要这些脚本：better-sqlite3 自带 N-API 预编译产物，Vite/Vitest/Jest 均实测可用。**未使用** `npm approve-scripts` 放行任何脚本。
 - 本次未安装任何额外的系统软件、SDK、CLI 或运行环境；Android 构建所需的 compileSdk 37 / buildTools 37.0.0 / NDK 27.1.12297006 本机已存在，未下载任何 SDK 组件。
 
