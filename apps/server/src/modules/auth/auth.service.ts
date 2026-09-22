@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   generateRecoveryCodes,
+  normalizeRecoveryCode,
   normalizeUsername,
   validatePassword,
   validateUsername,
@@ -12,6 +13,7 @@ import {
   type CaptchaChallenge,
   type LoginResponse,
   type PublicUser,
+  type RecoveryResponse,
   type RegisterResponse,
   type SessionSummary,
 } from '@leximochi/types';
@@ -117,7 +119,10 @@ export class AuthService {
         count: this.config.recoveryCodeCount,
         randomBytes,
       });
-      const codeHashes = await Promise.all(plainCodes.map((code) => this.hasher.hash(code)));
+      // 统一哈希「归一化后」的恢复码，保证用户带/不带连字符、大小写不同都能校验
+      const codeHashes = await Promise.all(
+        plainCodes.map((code) => this.hasher.hash(normalizeRecoveryCode(code))),
+      );
       await this.recoveryCodes.replaceAllForUser(user.id, codeHashes, now);
       await this.audit.record({
         actorUserId: user.id,
@@ -330,6 +335,101 @@ export class AuthService {
       user: await this.users.toPublicUser(user),
       permissions: await this.users.listPermissions(userId),
     };
+  }
+
+  async recover(
+    input: {
+      username: string;
+      recoveryCode: string;
+      newPassword: string;
+      captchaToken: string;
+      captchaAnswer: string;
+    },
+    ctx: RequestContext,
+  ): Promise<RecoveryResponse> {
+    const captchaOk = await this.captcha.verify({
+      token: input.captchaToken,
+      answer: input.captchaAnswer,
+      ip: normalizeIp(ctx.ip),
+    });
+    if (!captchaOk) {
+      throw new AppError(ErrorCode.CAPTCHA_FAILED, '人机验证失败，请重试', 400);
+    }
+
+    // 先校验新密码强度再消费恢复码：弱密码不应消耗一次性恢复码
+    const passwordCheck = validatePassword(input.newPassword, { username: input.username });
+    if (!passwordCheck.ok) {
+      throw new AppError(ErrorCode.VALIDATION_FAILED, '新密码不符合要求', 400, {
+        newPassword: [passwordCheck.reason],
+      });
+    }
+
+    const invalidError = new AppError(
+      ErrorCode.AUTH_RECOVERY_CODE_INVALID,
+      '恢复码无效或已使用',
+      400,
+    );
+    const user = await this.users.findByUsernameCanonical(normalizeUsername(input.username));
+    if (!user) {
+      // 时序对齐：账号不存在时也做一次等价耗时的哈希校验，避免枚举账号
+      await this.hasher.verify(DUMMY_ARGON2_HASH, input.newPassword);
+      throw invalidError;
+    }
+
+    const normalizedCode = normalizeRecoveryCode(input.recoveryCode);
+    const candidates = await this.recoveryCodes.listUnused(user.id);
+    let matchedId: string | null = null;
+    for (const candidate of candidates) {
+      if (await this.hasher.verify(candidate.codeHash, normalizedCode)) {
+        matchedId = candidate.id;
+        break;
+      }
+    }
+    if (!matchedId) {
+      await this.audit.record({
+        actorUserId: user.id,
+        actorType: 'user',
+        action: 'auth.recovery.failed',
+        targetType: 'user',
+        targetId: user.id,
+        result: 'failure',
+        ...ctx,
+      });
+      throw invalidError;
+    }
+
+    const now = Date.now();
+    // 条件更新：并发或重放时只有一次能成功消费该恢复码
+    const consumed = await this.recoveryCodes.consume(user.id, matchedId, now, normalizeIp(ctx.ip));
+    if (!consumed) {
+      throw invalidError;
+    }
+
+    const passwordHash = await this.hasher.hash(input.newPassword);
+    await this.users.updatePassword(user.id, passwordHash, now);
+    await this.sessions.revokeAllForUser(user.id, 'recovery_used', now);
+
+    const plainCodes = generateRecoveryCodes({ count: this.config.recoveryCodeCount, randomBytes });
+    const codeHashes = await Promise.all(
+      plainCodes.map((code) => this.hasher.hash(normalizeRecoveryCode(code))),
+    );
+    await this.recoveryCodes.replaceAllForUser(user.id, codeHashes, now);
+
+    await this.audit.record({
+      actorUserId: user.id,
+      actorType: 'user',
+      action: 'auth.recovery.succeeded',
+      targetType: 'user',
+      targetId: user.id,
+      result: 'success',
+      ...ctx,
+    });
+
+    const updated = await this.users.findById(user.id);
+    if (!updated) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, '用户状态异常', 500);
+    }
+    return { user: await this.users.toPublicUser(updated), recoveryCodes: plainCodes };
   }
 
   private async createSession(

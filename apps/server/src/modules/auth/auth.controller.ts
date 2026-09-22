@@ -17,6 +17,7 @@ import {
   type CaptchaChallenge,
   type LoginResponse,
   type MeResponse,
+  type RecoveryResponse,
   type RegisterResponse,
   type SessionSummary,
 } from '@leximochi/types';
@@ -27,6 +28,7 @@ import type { RequestWithId } from '../../common/middleware/request-context.midd
 import { AuthService, type IssuedTokens, type RequestContext } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto, RefreshDto } from './dto/refresh.dto';
+import { RecoveryDto } from './dto/recovery.dto';
 import { RegisterDto } from './dto/register.dto';
 
 function toContext(req: RequestWithId): RequestContext {
@@ -70,6 +72,16 @@ export class AuthController {
   ): Promise<{ data: LoginResponse | Omit<LoginResponse, 'refreshToken'> }> {
     const result = await this.auth.login(dto, toContext(req));
     return { data: this.applyRefreshTransport(result, req, res) };
+  }
+
+  @Public()
+  @Post('recovery')
+  @HttpCode(200)
+  async recovery(
+    @Body() dto: RecoveryDto,
+    @Req() req: RequestWithId,
+  ): Promise<{ data: RecoveryResponse }> {
+    return { data: await this.auth.recover(dto, toContext(req)) };
   }
 
   @Public()
