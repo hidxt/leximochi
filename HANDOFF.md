@@ -6,8 +6,8 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-22
-- 当前阶段：**Phase 1 全部 15 个任务的实现已完成**（含四端与验收文档），等待用户确认是否进入 Phase 2
-- 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）
+- 当前阶段：**Phase 2（单词核心）执行中** —— 计划已定稿，已完成 Task 1（SM-2 核心）、Task 2（题型/DTO 契约）、Task 3（Phase 2 schema 与迁移）
+- 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）。Phase 2 尚在服务端与共享包阶段，四端界面未开始改造
 
 ---
 
@@ -101,6 +101,8 @@ leximochi/
 
 ## 5. 数据库与 Migration 状态
 
+- **Phase 2 迁移**：`apps/server/drizzle/0001_thin_pandemic.sql`（13 张新表 / 19 外键 / 4 个唯一索引 / 3 个复合主键），随启动自动执行；ER 与约束说明见 `docs/database-design.md` 第 9 节。
+
 - 数据库：SQLite，路径来自 `DATABASE_PATH`（本地默认 `apps/server/data/db/leximochi.sqlite`，`data/` 不入 Git）。
 - 连接参数（启动时设置并**断言生效**）：`journal_mode=WAL`、`busy_timeout=5000`、`foreign_keys=ON`、`synchronous=NORMAL`。
 - Migration：首版 `apps/server/drizzle/0000_real_steve_rogers.sql`，启动时自动执行未应用迁移（`runMigrations`）。
@@ -186,7 +188,7 @@ leximochi/
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 13 suites / 77 tests 全通过（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `npm test -w @leximochi/server` | 14 suites / 85 tests 全通过（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
 | `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |

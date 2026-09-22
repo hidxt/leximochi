@@ -254,3 +254,48 @@ ADMIN_PASSWORD='<strong-password>' npm run --workspace apps/server create-admin 
 | 审计 | `audit_logs` 覆盖管理员操作与敏感认证事件 |
 | 数据完整性 | WAL、`busy_timeout`、外键、事务、migration、备份 |
 | 时间可信 | 全部时间由服务端 UTC 生成 |
+
+---
+
+## 9. Phase 2 新增表（单词核心）
+
+迁移：`apps/server/drizzle/0001_thin_pandemic.sql`（13 张表 / 19 个外键）。
+通用约定与第 1 节一致（TEXT UUID 主键、INTEGER UTC 毫秒、布尔 0/1、外键显式 ON DELETE）。
+
+### 9.1 词库与词条（纯数据，不硬编码任何具体词库）
+
+| 表 | 关键列与约束 |
+| --- | --- |
+| `wordbooks` | `key` UNIQUE（如 `cet4`/`cet6`，**仅是数据**）、`name`、`language`、`is_system`、`version`（内容变化递增，供离线下载比对）、`word_count`、`created_at`/`updated_at` |
+| `words` | `headword`、`headword_canonical` UNIQUE（归一化后唯一）、`phonetic_uk`/`phonetic_us`、`audio_uk_key`/`audio_us_key`（仅存 StorageProvider key，**不得存绝对路径**）、`source`（`dictionary`/`imported`） |
+| `wordbook_entries` | PK `(wordbook_id, word_id)`，`rank`（词库内教学顺序），`tags_json`（如 `["高频"]`）；两个外键均 `ON DELETE CASCADE`；索引 `(wordbook_id, rank)` |
+| `word_senses` | `definition_zh` 必填、`definition_en`、`exam_meaning`（**四六级常考含义**）、`part_of_speech`、`sort_order` |
+| `word_examples` | `text_en`/`text_zh` 必填、`audio_key`、`sense_id` 可空（`ON DELETE SET NULL`） |
+| `word_phrases` | `kind`（`phrase`/`collocation`）区分常见短语与常见搭配，`text`/`translation` 必填 |
+| `word_forms` | `form_type`（`past`/`plural`/`comparative`/…）+ `value` |
+| `word_relations` | `relation_type`（`synonym`/`antonym`/`confusable`），`target_word_id` 可空（`SET NULL`）+ `target_text` 可空（目标词可能尚未入库） |
+| `word_ai_notes` | `word_id` UNIQUE；只含 `memory_tip`/`usage_note`/`confusable_note`/`extra_examples_json` + `provider`/`model`/`generated_at`。**AI 内容独立成表，永不写入词典表** |
+
+### 9.2 用户学习数据
+
+| 表 | 关键列与约束 |
+| --- | --- |
+| `user_word_states` | PK `(user_id, word_id)`；SM-2 状态：`status`、`ease_factor`、`interval_days`、`repetitions`、`lapses`、`due_at`、`last_reviewed_at`、`first_learned_at`、`total_reviews`、`correct_reviews`；索引 `(user_id, due_at)`、`(user_id, status)` |
+| `review_logs` | `event_id` **UNIQUE**（幂等最后防线）；全量留痕：`question_type`、`answer_raw`、`is_correct`、`rating`、`duration_ms`、`answered_at`、`client_answered_at`、`ease_factor_after`、`interval_days_after`、`repetitions_after`、`due_at_after`、`source`；索引 `(user_id, answered_at)`、`(user_id, word_id)` |
+| `user_notebook` | PK `(user_id, word_id)`；`note`、`source`（`manual`/`from_review`/`from_listening`）、`added_at`；索引 `(user_id, added_at)` |
+| `spelling_errors` | `review_log_id` 外键 `ON DELETE CASCADE`；`expected`/`actual`、`error_types`（逗号分隔：`missing_letter`/`duplicate_letter`/`order_error`/`wrong_letter`）；索引 `(user_id, word_id, created_at)` |
+
+### 9.3 为什么不建统计表
+
+学习历史与统计在 Phase 2 直接由 `review_logs` 聚合（今日新学/复习数、正确率、平均用时、已掌握词数、近 7 日趋势）。
+理由：避免过早引入聚合表带来的一致性维护成本；`(user_id, answered_at)` 索引足以支撑当前数据量。若 Phase 3 出现性能瓶颈再评估物化统计。
+
+### 9.4 与安全红线的对应
+
+| 红线要求 | Phase 2 落实 |
+| --- | --- |
+| 客户端不可信 | 客户端只提交答题事实（`answer`/`durationMs`/`eventId`）；`ease_factor`/`interval_days`/`due_at` 等结果值只由服务端计算并写入 |
+| 幂等与防重复 | `review_logs.event_id` UNIQUE + 单事务更新 `user_word_states` |
+| 完整留痕（可迁移 FSRS） | `review_logs` 保存每次评分后的 `ease_factor_after`/`interval_days_after`/`repetitions_after`/`due_at_after` |
+| 数据与 AI 内容区分 | `word_ai_notes` 独立表 + `words.source` 字段 |
+| 文件路径安全 | 音频只存 `StorageProvider` key，不存绝对路径 |

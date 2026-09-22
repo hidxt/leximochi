@@ -29,7 +29,7 @@
 
 ## 1. 数据模型（Phase 2 新增表）
 
-按 `docs/database-design.md` 的通用约定（TEXT 主键 UUIDv4、INTEGER UTC 毫秒、布尔为 0/1、外键显式 ON DELETE、服务端权威时间）。
+按 `docs/database-design.md` 的通用约定（TEXT 主键 UUIDv4、INTEGER UTC 毫秒、布尔为 0/1、外键显式 ON DELETE、服务端权威时间）。共 **13 张新表**。
 
 ### 1.1 词库与词条（词典数据）
 
@@ -169,7 +169,7 @@ export interface StorageProvider {
 | --- | --- | --- |
 | 1 | 共享包：SM-2 核心算法 | `packages/core/src/sm2.ts` + 单测（评分映射、四种评分的间隔/难度变化、边界与下限、掌握判定） |
 | 2 | 共享包：题型与 DTO 契约 | `packages/types`：`QuestionType`、`ReviewRating`、`WordStatus`、题目/提交/统计的 DTO；`error-code` 增补 |
-| 3 | 数据库：Phase 2 schema 与迁移 | 12 张新表 + 索引/唯一约束（`event_id` 唯一、`(user_id, word_id)` 复合主键等） |
+| 3 | 数据库：Phase 2 schema 与迁移 | 13 张新表 + 索引/唯一约束（`event_id` 唯一、`(user_id, word_id)` 复合主键等） |
 | 4 | 存储层：StorageProvider 与上传安全 | 接口 + 本地实现 + `file-validation` 纯函数 + 单测（魔数/大小/扩展名/路径穿越） |
 | 5 | 词库仓储与只读接口 | `wordbooks`/`words`/`wordbook_entries` 仓储 + `GET /wordbooks`、`/version`、`/words` 分页导出、`/words/:id`、`/words/search` |
 | 6 | 种子数据：CET-4 / CET-6 | 结构化 JSON（许可明确的自制/公开数据），含释义、音标、例句、短语、搭配、词形、关系、常考含义；导入脚本 |
