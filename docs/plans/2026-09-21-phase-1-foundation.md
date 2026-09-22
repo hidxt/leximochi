@@ -5413,6 +5413,9 @@ Phase 1 判定为完成，必须**同时**满足以下全部条件，且每条�
 | D17 | 测试用 `app.get(ChallengeCaptchaProvider)` 取验证码 Provider | 改为 `app.get<ChallengeCaptchaProvider>(CAPTCHA_PROVIDER)` | 该 Provider 以令牌 `CAPTCHA_PROVIDER` 通过 `useFactory` 注册，类本身不是 Provider（实测 `Nest could not find ChallengeCaptchaProvider element`） |
 | D18 | 用 `Algorithm.Argon2id` 指定算法 | 改用数值 `2`（附注释） | `@node-rs/argon2` 的 `Algorithm` 是 ambient const enum，`isolatedModules: true` 下不可访问（实测 `TS2748`） |
 | D19 | `RoleRepository` 含 `canAssignRole` | Phase 1 未实现该方法（无调用方），改为在 Drizzle 实现中提供 `hasRole` 供后续权限管理使用 | 避免出现无调用方的接口方法（YAGNI）；如后续需要角色授予权限校验再补 |
+| D20 | 计划测试期望「封禁后 `/auth/me` 返回 403」 | 实际为 **401**（测试已按实际行为修正） | 封禁会撤销该用户全部会话，旧 access token 对应的会话已不存在，认证守卫先于用户状态检查判定 token 无效。401 也更少泄露「账号被封禁」这一信息 |
+| D21 | 计划中的封禁不存在用户测试用 `reason: 'x'` | 改为合法原因后再断言 404 | `reason` 有 `MinLength(2)` 的 DTO 校验，非法原因会先返回 400，无法到达 404 分支 |
+| D22 | 未明确引导管理员的恢复码 | 引导管理员**不生成恢复码**，脚本会打印提示 | 保持脚本简单且不把任何凭证写入终端输出；替代路径：先用注册流程创建账号再由后台授予 admin。已记入 `HANDOFF.md` 技术债 |
 
 
 

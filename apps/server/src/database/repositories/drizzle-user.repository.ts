@@ -1,12 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { ErrorCode, type PublicUser } from '@leximochi/types';
 import { AppError } from '../../common/errors/app-error';
 import { DATABASE } from '../database.constants';
 import type { DatabaseService } from '../database.service';
 import { permissions, rolePermissions, roles, userRoles, users } from '../schema';
 import type {
+  AdminUserFilter,
+  AdminUserItem,
+  AdminUserListResult,
   CreateUserInput,
   UserRecord,
   UserRepository,
@@ -134,6 +137,102 @@ export class DrizzleUserRepository implements UserRepository {
       roles: await this.listRoles(record.id),
       createdAt: record.createdAt,
     };
+  }
+
+  async listForAdmin(filter: AdminUserFilter): Promise<AdminUserListResult> {
+    const limit = Math.min(Math.max(filter.limit, 1), 100);
+    const cursor = decodeCursor(filter.cursor);
+    const conditions = [];
+    if (filter.status) conditions.push(eq(users.status, filter.status));
+    if (filter.query) {
+      const pattern = `%${escapeLike(filter.query.toLowerCase())}%`;
+      conditions.push(
+        sql`(lower(${users.username}) LIKE ${pattern} ESCAPE '\\' OR ${users.usernameCanonical} LIKE ${pattern} ESCAPE '\\')`,
+      );
+    }
+    if (cursor) {
+      conditions.push(
+        or(
+          lt(users.createdAt, cursor.createdAt),
+          and(eq(users.createdAt, cursor.createdAt), lt(users.id, cursor.id)),
+        )!,
+      );
+    }
+
+    const rows = this.database.db
+      .select()
+      .from(users)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(users.createdAt), desc(users.id))
+      .limit(limit + 1)
+      .all();
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const rolesByUser = await this.rolesForUsers(page.map((row) => row.id));
+    const last = page[page.length - 1];
+
+    return {
+      items: page.map((row) => ({
+        id: row.id,
+        username: row.username,
+        status: row.status,
+        roles: rolesByUser.get(row.id) ?? [],
+        createdAt: row.createdAt,
+        lastLoginAt: row.lastLoginAt,
+      })),
+      nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null,
+    };
+  }
+
+  async findAdminItemById(id: string): Promise<AdminUserItem | null> {
+    const row = this.database.db.select().from(users).where(eq(users.id, id)).get();
+    if (!row) return null;
+    return {
+      id: row.id,
+      username: row.username,
+      status: row.status,
+      roles: await this.listRoles(row.id),
+      createdAt: row.createdAt,
+      lastLoginAt: row.lastLoginAt,
+    };
+  }
+
+  private async rolesForUsers(userIds: string[]): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    if (userIds.length === 0) return result;
+    const rows = this.database.db
+      .select({ userId: userRoles.userId, key: roles.key })
+      .from(userRoles)
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .where(inArray(userRoles.userId, userIds))
+      .all();
+    for (const row of rows) {
+      const list = result.get(row.userId) ?? [];
+      list.push(row.key);
+      result.set(row.userId, list);
+    }
+    return result;
+  }
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+function encodeCursor(createdAt: number, id: string): string {
+  return Buffer.from(`${createdAt}:${id}`, 'utf8').toString('base64url');
+}
+
+function decodeCursor(cursor: string | undefined): { createdAt: number; id: string } | null {
+  if (!cursor) return null;
+  try {
+    const [rawCreatedAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split(':');
+    const createdAt = Number(rawCreatedAt);
+    if (!Number.isFinite(createdAt) || !id) return null;
+    return { createdAt, id };
+  } catch {
+    return null;
   }
 }
 
