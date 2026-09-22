@@ -215,3 +215,19 @@
 | `RATE_LIMITED` | 429 | 请求过于频繁 |
 | `CONFLICT` | 409 | 通用冲突 |
 | `INTERNAL_ERROR` | 500 | 服务器内部错误（细节只进服务端日志） |
+
+---
+
+## 7. 词库与词条（Phase 2，需登录）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/wordbooks` | 可用词库列表：`id`/`key`/`name`/`description`/`language`/`version`/`wordCount`/`isSystem`。**词库是数据**：新增词库无需改代码 |
+| GET | `/wordbooks/:key/version` | `{ key, version, wordCount, updatedAt }`，供 Android 判断是否需要重新下载 |
+| GET | `/wordbooks/:key/words?cursor=&limit=` | 分页导出完整词条（含释义/例句/短语搭配/词形/关系）用于离线学习；`limit` 1–200，默认 50；游标为 `wordId` 升序 |
+| GET | `/words/search?q=&wordbookKey=&limit=` | 按词形搜索；`q` 的 LIKE 通配符已转义；`limit` 1–50，默认 20 |
+| GET | `/words/:id` | 词条详情：词典字段 + **独立的 AI 补充** `aiNotes` + 当前用户 `state`（未学过为 `null`） |
+
+说明：
+- 音频只以 `StorageProvider` 的 key 形式返回（如 `words/uk/xxx.mp3`），**绝不返回服务器绝对路径**；播放地址由后续鉴权接口换取。
+- 错误：未知词库 `404 WORDBOOK_NOT_FOUND`、未知词条 `404 WORD_NOT_FOUND`；未登录 `401`。
