@@ -27,13 +27,28 @@
 | 仓库根目录 | `C:\Users\auzasr\Documents\Projects\leximochi`（唯一项目目录） |
 | 当前分支 | `main` |
 | 上游 | `origin/main`（`git@github.com:hidxt/leximochi.git`，SSH） |
-| 最近 commit | `2b3dba5 feat(api-client,auth): 实现类型安全 HTTP 客户端与会话管理器` |
-| 之前 commit | `4919082`（RBAC 与后台）→ `8d33d5d`（限流）→ `055ea23`（恢复码）→ `ce53d73`（登录与会话）→ `b5ca547`（注册）→ `f94a7bf`（数据库）→ `4a96e7d`（服务端骨架）→ `16097b3`（types）→ `0904604`（Monorepo）→ `6689da0`（架构与计划）→ `7368587`（决策与版本清单）→ `714fac7`（安全红线与交接）→ `8649e27`（初始） |
+| 最近 commit | `819d59a docs: 补充 Android 构建文档并明确密钥规则` |
+| 完整历史 | `819d59a` → `f5e25ba` → `5316c25` → `1e521d6`（mobile）→ `434d50c`（admin）→ `2481677`（web）→ `3c5776b` → `2b3dba5`（api-client/auth）→ `4919082`（RBAC/后台）→ `8d33d5d`（限流）→ `055ea23`（恢复码）→ `1fd09e7` → `ce53d73`（登录/会话）→ `b5ca547`（注册）→ `f94a7bf`（数据库）→ `4a96e7d`（服务端骨架）→ `f575beb`（core/shared）→ `16097b3`（types）→ `0904604`（Monorepo）→ `6689da0`（架构与计划）→ `7368587` → `714fac7`（安全红线/交接）→ `8649e27`（Initial commit） |
+| 本地备份引用 | `tag pre-mobile-history-cleanup-20260922`、`branch backup/pre-mobile-cleanup-20260922`（保留历史清理前的旧提交，含被移除的 gitlink 提交；确认无误后可删除） |
 | 工作区 | 干净（`git status` 无未提交改动） |
-| 远端 | **未 push**（本地领先 `origin/main` 8 个 commit，是否推送由用户决定） |
+| 远端 | `origin/main`；本地领先，push 状态见下文「Push 记录」 |
 | 许可证 | Apache-2.0（`LICENSE`） |
 
 ---
+
+### 2.1 Git 历史清理记录（2026-09-22，用户已批准）
+
+RN CLI 在 `apps/mobile` 内自行执行了 `git init`，导致首次提交 `c67d96a` 只记录了一个**嵌套仓库引用（gitlink）**而非真实文件。
+
+| 项 | 内容 |
+| --- | --- |
+| 备份 | 清理前 HEAD `2f5e948`；已建 tag `pre-mobile-history-cleanup-20260922` 与分支 `backup/pre-mobile-cleanup-20260922` |
+| 处理 | 脚本化 `git rebase -i 434d50c`，把 `523fd24`（写入 42 个真实文件、删除 gitlink）标记为 `fixup` 合并进 `c67d96a` |
+| 结果 | 提交数 4 → 3：`c67d96a` + `523fd24` → 单一提交 `1e521d6`（含真实文件与文档，无 gitlink） |
+| 内容校验 | `git diff backup/pre-mobile-cleanup-20260922 HEAD` → **无任何差异**（未丢失文件或代码） |
+| 结构校验 | `HEAD` 树中 gitlink 数 0；无嵌套 `.git`、无 `.gitmodules`、`git submodule status` 为空；`apps/mobile` 跟踪文件 42 个 |
+| gitlink 残留位置 | 仅存在于备份引用指向的旧提交中（`c67d96a`），主干不可达 |
+| 回归验证 | 清理后重跑 `typecheck`/`lint`/`test`/`build` 全部 exit 0，121 个用例通过（与清理前一致） |
 
 ## 3. 当前目录结构（仅列已存在内容）
 
