@@ -97,6 +97,7 @@ src/
 │   ├── decorators/             # @CurrentUser / @RequirePermissions / @Public
 │   ├── guards/                 # 认证守卫、权限守卫
 │   └── interceptors/           # 统一响应、请求上下文（requestId）
+├── storage/                    # 文件存储：StorageProvider 接口 + 本地实现 + 上传安全校验
 ├── database/
 │   ├── connection.ts           # better-sqlite3 + PRAGMA + WAL
 │   ├── schema/                 # Drizzle 表定义（按领域分文件）
@@ -104,7 +105,7 @@ src/
 │   ├── transaction.ts          # 事务辅助
 │   └── repositories/           # 仓储的 Drizzle 实现
 └── modules/
-    ├── health/                 # 存活与就绪检查
+    ├── health/                 # 存活与就绪检查（Phase 2 追加 vocabulary / review / study）
     ├── auth/                   # 注册、登录、刷新、登出、恢复码、验证码
     ├── users/                  # 用户资料与状态（含封禁）
     ├── audit/                  # 审计日志服务（管理员操作与敏感认证事件）

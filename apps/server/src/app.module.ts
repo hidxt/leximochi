@@ -8,6 +8,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -19,6 +20,7 @@ import { UsersModule } from './modules/users/users.module';
     AppConfigModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     DatabaseModule,
+    StorageModule,
     AuditModule,
     UsersModule,
     AuthModule,
