@@ -4,10 +4,15 @@
   "private": true,
   "description": "Gamified English learning with vocabulary, AI speaking, listening practice, and a virtual pet companion.",
   "license": "Apache-2.0",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=24.3.0" },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.3.0"
+  },
   "scripts": {
-    "build:packages": "npm run build -w @leximochi/types && npm run build -w @leximochi/shared && npm run build -w @leximochi/core",
+    "build:packages": "npm run build -w @leximochi/types && npm run build -w @leximochi/shared && npm run build -w @leximochi/core && npm run build -w @leximochi/api-client && npm run build -w @leximochi/auth",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build:packages && npm run test --workspaces --if-present",
