@@ -1,0 +1,269 @@
+:root {
+  --paper: #faf6ee;
+  --surface: #fffcf6;
+  --ink: #191510;
+  --ink-soft: #6a6055;
+  --cinnabar: #c8382b;
+  --danger: #a62d22;
+  --border: #e4daca;
+  --rule: #ddd2c0;
+
+  --font-display: 'Noto Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cinnabar);
+  outline-offset: 2px;
+}
+
+/* 后台采用「账册」布局：顶部栏 + 全宽密表，不做卡片堆叠 */
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.topbar__title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.topbar__meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.page {
+  padding: 24px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.page__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.page__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  margin: 0;
+}
+
+.page__note {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field__label {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+input[type='text'],
+input[type='password'],
+input[type='search'],
+select,
+textarea {
+  font: inherit;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  min-width: 120px;
+}
+
+.button {
+  font: inherit;
+  padding: 7px 14px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button--quiet {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.button--danger {
+  background: var(--cinnabar);
+  border-color: var(--cinnabar);
+}
+
+.button--link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--cinnabar);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 密表：细横线、等宽数字、无斑马纹（账册感而非仪表盘感） */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+  background: rgba(25, 21, 16, 0.02);
+}
+
+.table td.mono,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.tag--banned {
+  color: var(--cinnabar);
+  border-color: var(--cinnabar);
+}
+
+.tag--active {
+  color: var(--ink-soft);
+}
+
+.notice {
+  border-left: 3px solid var(--ink-soft);
+  background: rgba(25, 21, 16, 0.03);
+  padding: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.notice--error {
+  border-left-color: var(--danger);
+  background: rgba(166, 45, 34, 0.06);
+}
+
+.empty {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 16px 12px;
+}
+
+/* 二次确认对话框 */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(25, 21, 16, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  padding: 20px;
+  width: min(440px, 100%);
+}
+
+.dialog__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.dialog__description {
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.login {
+  max-width: 380px;
+  margin: 80px auto;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
