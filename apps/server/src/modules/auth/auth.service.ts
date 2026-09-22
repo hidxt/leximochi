@@ -29,11 +29,9 @@ import { ROLE_REPOSITORY, type RoleRepository } from '../users/domain/role.repos
 import { USER_REPOSITORY, type UserRepository } from '../users/domain/user.repository';
 import { DUMMY_ARGON2_HASH } from './auth.constants';
 import { CAPTCHA_PROVIDER, type CaptchaProvider } from './captcha/captcha.provider';
-import {
-  SESSION_REPOSITORY,
-  type SessionRepository,
-} from './domain/session.repository';
+import { SESSION_REPOSITORY, type SessionRepository } from './domain/session.repository';
 import { PasswordHasher } from './password-hasher';
+import { RateLimitService } from './rate-limit.service';
 import { TokenService } from './token.service';
 
 export interface RequestContext {
@@ -57,12 +55,15 @@ export class AuthService {
     @Inject(RECOVERY_CODE_REPOSITORY) private readonly recoveryCodes: RecoveryCodeRepository,
     @Inject(ROLE_REPOSITORY) private readonly roles: RoleRepository,
     @Inject(SESSION_REPOSITORY) private readonly sessions: SessionRepository,
+    private readonly rateLimit: RateLimitService,
     private readonly tokens: TokenService,
     private readonly hasher: PasswordHasher,
     private readonly audit: AuditService,
   ) {}
 
-  issueCaptcha(ctx: RequestContext): Promise<CaptchaChallenge> {
+  async issueCaptcha(ctx: RequestContext): Promise<CaptchaChallenge> {
+    await this.rateLimit.assertCaptchaAllowed(ctx.ip);
+    await this.rateLimit.record({ kind: 'captcha', ip: ctx.ip, success: true });
     return this.captcha.issue({ ip: normalizeIp(ctx.ip) });
   }
 
@@ -97,6 +98,18 @@ export class AuthService {
         ...ctx,
       });
       throw new AppError(ErrorCode.CAPTCHA_FAILED, '人机验证失败，请重试', 400);
+    }
+
+    try {
+      await this.rateLimit.assertRegisterAllowed(ctx.ip);
+    } catch (error) {
+      await this.rateLimit.record({
+        kind: 'register',
+        usernameCanonical: normalizeUsername(input.username),
+        ip: ctx.ip,
+        success: false,
+      });
+      throw error;
     }
 
     const userRole = await this.roles.findByKey(RoleKey.User);
@@ -135,6 +148,12 @@ export class AuthService {
       });
       return { user: await this.users.toPublicUser(user), recoveryCodes: plainCodes };
     } catch (error) {
+      await this.rateLimit.record({
+        kind: 'register',
+        usernameCanonical: normalizeUsername(input.username),
+        ip: ctx.ip,
+        success: false,
+      });
       await this.users.removeById(user.id);
       await this.audit.record({
         actorUserId: null,
@@ -151,11 +170,33 @@ export class AuthService {
 
   async login(input: { username: string; password: string }, ctx: RequestContext): Promise<LoginResponse> {
     const canonical = normalizeUsername(input.username);
+    try {
+      await this.rateLimit.assertLoginAllowed({ usernameCanonical: canonical, ip: ctx.ip });
+    } catch (error) {
+      await this.audit.record({
+        actorUserId: null,
+        actorType: 'anonymous',
+        action: 'auth.login.locked',
+        targetType: 'user',
+        targetId: null,
+        result: 'failure',
+        metadata: { username: canonical },
+        ...ctx,
+      });
+      throw error;
+    }
+
     const user = await this.users.findByUsernameCanonical(canonical);
 
     if (!user) {
       // 时序对齐：账号不存在时也执行一次等价耗时的哈希校验
       await this.hasher.verify(DUMMY_ARGON2_HASH, input.password);
+      await this.rateLimit.record({
+        kind: 'login',
+        usernameCanonical: canonical,
+        ip: ctx.ip,
+        success: false,
+      });
       throw new AppError(ErrorCode.AUTH_INVALID_CREDENTIALS, '用户名或密码不正确', 401);
     }
     if (user.status === 'banned') {
@@ -164,6 +205,12 @@ export class AuthService {
 
     const passwordOk = await this.hasher.verify(user.passwordHash, input.password);
     if (!passwordOk) {
+      await this.rateLimit.record({
+        kind: 'login',
+        usernameCanonical: canonical,
+        ip: ctx.ip,
+        success: false,
+      });
       await this.audit.record({
         actorUserId: user.id,
         actorType: 'user',
@@ -175,6 +222,14 @@ export class AuthService {
       });
       throw new AppError(ErrorCode.AUTH_INVALID_CREDENTIALS, '用户名或密码不正确', 401);
     }
+
+    await this.rateLimit.record({
+      kind: 'login',
+      usernameCanonical: canonical,
+      ip: ctx.ip,
+      success: true,
+    });
+    await this.rateLimit.clearLoginFailures(canonical);
 
     const now = Date.now();
     const issued = await this.createSession(user.id, ctx, { familyId: randomUUID(), now });
@@ -364,12 +419,15 @@ export class AuthService {
       });
     }
 
+    const canonical = normalizeUsername(input.username);
+    await this.rateLimit.assertRecoveryAllowed(canonical);
+
     const invalidError = new AppError(
       ErrorCode.AUTH_RECOVERY_CODE_INVALID,
       '恢复码无效或已使用',
       400,
     );
-    const user = await this.users.findByUsernameCanonical(normalizeUsername(input.username));
+    const user = await this.users.findByUsernameCanonical(canonical);
     if (!user) {
       // 时序对齐：账号不存在时也做一次等价耗时的哈希校验，避免枚举账号
       await this.hasher.verify(DUMMY_ARGON2_HASH, input.newPassword);
@@ -386,6 +444,12 @@ export class AuthService {
       }
     }
     if (!matchedId) {
+      await this.rateLimit.record({
+        kind: 'recovery',
+        usernameCanonical: canonical,
+        ip: ctx.ip,
+        success: false,
+      });
       await this.audit.record({
         actorUserId: user.id,
         actorType: 'user',
@@ -415,6 +479,12 @@ export class AuthService {
     );
     await this.recoveryCodes.replaceAllForUser(user.id, codeHashes, now);
 
+    await this.rateLimit.record({
+      kind: 'recovery',
+      usernameCanonical: canonical,
+      ip: ctx.ip,
+      success: true,
+    });
     await this.audit.record({
       actorUserId: user.id,
       actorType: 'user',

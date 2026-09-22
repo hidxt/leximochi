@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DrizzleAuthAttemptRepository } from '../../database/repositories/drizzle-auth-attempt.repository';
 import { DrizzleSessionRepository } from '../../database/repositories/drizzle-session.repository';
 import type { ServerConfig } from '../../config/configuration';
 import { AuditModule } from '../audit/audit.module';
@@ -7,8 +8,10 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CAPTCHA_PROVIDER } from './captcha/captcha.provider';
 import { ChallengeCaptchaProvider } from './captcha/challenge-captcha.provider';
+import { AUTH_ATTEMPT_REPOSITORY } from './domain/auth-attempt.repository';
 import { SESSION_REPOSITORY } from './domain/session.repository';
 import { PasswordHasher } from './password-hasher';
+import { RateLimitService } from './rate-limit.service';
 import { TokenService } from './token.service';
 
 @Module({
@@ -19,6 +22,13 @@ import { TokenService } from './token.service';
     AuthService,
     DrizzleSessionRepository,
     { provide: SESSION_REPOSITORY, useExisting: DrizzleSessionRepository },
+    DrizzleAuthAttemptRepository,
+    { provide: AUTH_ATTEMPT_REPOSITORY, useExisting: DrizzleAuthAttemptRepository },
+    {
+      provide: RateLimitService,
+      inject: [AUTH_ATTEMPT_REPOSITORY, 'CONFIG'],
+      useFactory: (attempts, config: ServerConfig) => new RateLimitService(attempts, config.lockout),
+    },
     {
       provide: TokenService,
       inject: ['CONFIG'],
@@ -37,6 +47,6 @@ import { TokenService } from './token.service';
         new ChallengeCaptchaProvider({ captchaSecret: config.captchaSecret }),
     },
   ],
-  exports: [AuthService, PasswordHasher, TokenService, CAPTCHA_PROVIDER, SESSION_REPOSITORY],
+  exports: [AuthService, PasswordHasher, TokenService, RateLimitService, CAPTCHA_PROVIDER, SESSION_REPOSITORY],
 })
 export class AuthModule {}
