@@ -206,8 +206,9 @@ leximochi/
 ### Bug
 - 无已知功能缺陷（当前实现全部有测试覆盖且通过）。
 
-### 待用户决定
-- **Android 调试密钥 `apps/mobile/android/app/debug.keystore` 未入库**。RN 模板默认提交该文件（`storePassword/keyPassword` 均为公开的 `android`，仅用于 debug 签名，非真实秘密），但本项目红线 `SECURITY-GUARDRAILS.md` 明确禁止提交任何 `*.keystore`。当前处理：**不入库**，已在 `apps/mobile/.gitignore` 注释里写明生成命令（保证新克隆可复现构建）。若你更倾向于沿用 RN 约定直接提交该公开调试密钥，请告知，我会改为显式例外并在安全红线中注明理由。
+### 已定的密钥规则（用户决定，2026-09-22）
+- 任何 `*.keystore` / `*.jks` **一律不入库，不设例外**（含 RN 模板的公开调试密钥 `android/app/debug.keystore`）；发布签名密钥永不入库。
+- 全新克隆后按 `docs/android-build.md` 第 2 节的 `keytool` 命令在本地生成调试密钥即可完成 Debug 构建；`apps/mobile/.gitignore` 注释中保留了同一命令。
 
 ### 技术债
 1. `ChallengeCaptchaProvider` 的「已消费挑战」用**进程内 Set** 记录，多实例部署会失效（表 `captcha_challenges` 已建好，届时改用它）。
