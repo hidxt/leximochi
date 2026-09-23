@@ -3,6 +3,7 @@ import { DrizzleWordRepository } from '../../database/repositories/drizzle-word.
 import { DrizzleWordbookRepository } from '../../database/repositories/drizzle-wordbook.repository';
 import { WORD_REPOSITORY } from './domain/word.repository';
 import { WORDBOOK_REPOSITORY } from './domain/wordbook.repository';
+import { WordImportService } from './import/word-import.service';
 import { VocabularyController } from './vocabulary.controller';
 import { VocabularyService } from './vocabulary.service';
 
@@ -14,7 +15,8 @@ import { VocabularyService } from './vocabulary.service';
     { provide: WORDBOOK_REPOSITORY, useExisting: DrizzleWordbookRepository },
     { provide: WORD_REPOSITORY, useExisting: DrizzleWordRepository },
     VocabularyService,
+    WordImportService,
   ],
-  exports: [WORDBOOK_REPOSITORY, WORD_REPOSITORY, VocabularyService],
+  exports: [WORDBOOK_REPOSITORY, WORD_REPOSITORY, VocabularyService, WordImportService],
 })
 export class VocabularyModule {}

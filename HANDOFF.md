@@ -6,7 +6,11 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-22
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2 核心）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）
+- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2 核心）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6 的**导入工具**部分。
+
+### 阻塞项（需用户决定）
+- **CET-4/CET-6 真实词库数据未导入**：用户指定的数据源 `KyleBing/english-vocabulary` **没有任何许可证**（无 LICENSE 文件、GitHub `license=null`、上游 `kajweb/dict` 同样无许可证，README 仅有「分享供学习」的表述）。按 `SECURITY-GUARDRAILS.md` 第 11 节与 `开发提示词.md` 的素材要求，「版权状态不明」的数据不得入库。核对结果与四种处置方案见 `docs/dataset-evaluation.md`。
+- 影响：Task 7 之后的学习/复习链路可先用自制小样本数据端到端验证，但**完整词表需等授权或改用有许可证的数据源**。
 - 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）。Phase 2 尚在服务端与共享包阶段，四端界面未开始改造
 
 ---
@@ -194,7 +198,7 @@ leximochi/
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 17 suites / 118 tests 全通过（Phase 2 追加：storage 20 个、词库只读接口 11 个） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `npm test -w @leximochi/server` | 18 suites / 126 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 8） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
 | `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |
