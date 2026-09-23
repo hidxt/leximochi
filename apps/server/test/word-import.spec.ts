@@ -187,6 +187,61 @@ describe('WordImportService', () => {
     expect(books.c).toBe(1);
   });
 
+
+  it('跨词库导入同一单词时合并内容而不是覆盖（不丢释义/例句）', async () => {
+    await service.importWordbook(
+      { key: 'book-a', name: '词库 A' },
+      [
+        {
+          headword: 'abandon',
+          senses: [{ partOfSpeech: 'v.', definitionZh: '放弃' }],
+          examples: [{ textEn: 'He abandoned his car.', textZh: '他丢弃了汽车。' }],
+        },
+      ],
+    );
+    await service.importWordbook(
+      { key: 'book-b', name: '词库 B' },
+      [{ headword: 'abandon', senses: [{ partOfSpeech: 'n.', definitionZh: '放纵' }] }],
+    );
+
+    // 单词全局共享：两个词库都能查到同一条记录
+    const word = db.sqlite
+      .prepare("SELECT id FROM words WHERE headword_canonical = 'abandon'")
+      .get() as { id: string };
+    const books = db.sqlite
+      .prepare('SELECT COUNT(*) AS c FROM wordbook_entries WHERE word_id = ?')
+      .get(word.id) as { c: number };
+    expect(books.c).toBe(2);
+
+    // 第二个词库没有的释义与例句必须保留下来（合并语义）
+    const senses = db.sqlite
+      .prepare('SELECT definition_zh FROM word_senses WHERE word_id = ? ORDER BY sort_order')
+      .all(word.id) as Array<{ definition_zh: string }>;
+    expect(senses.map((s) => s.definition_zh).sort()).toEqual(['放弃', '放纵']);
+    const examples = db.sqlite
+      .prepare('SELECT COUNT(*) AS c FROM word_examples WHERE word_id = ?')
+      .get(word.id) as { c: number };
+    expect(examples.c).toBe(1);
+  });
+
+  it('重复导入同一词库仍然幂等（合并不会导致内容重复累积）', async () => {
+    const payload = [
+      {
+        headword: 'ability',
+        senses: [{ partOfSpeech: 'n.', definitionZh: '能力' }],
+        examples: [{ textEn: 'He has the ability.', textZh: '他有能力。' }],
+      },
+    ];
+    await service.importWordbook({ key: 'idem', name: '幂等' }, payload);
+    await service.importWordbook({ key: 'idem', name: '幂等' }, payload);
+    await service.importWordbook({ key: 'idem', name: '幂等' }, payload);
+
+    const senses = db.sqlite.prepare('SELECT COUNT(*) AS c FROM word_senses').get() as { c: number };
+    const examples = db.sqlite.prepare('SELECT COUNT(*) AS c FROM word_examples').get() as { c: number };
+    expect(senses.c).toBe(1);
+    expect(examples.c).toBe(1);
+  });
+
   it('validateImportWord 直接校验词条结构', () => {
     expect(validateImportWord({ headword: 'ok', senses: [{ definitionZh: '释义' }] })).toBeNull();
     expect(validateImportWord({ headword: '', senses: [{ definitionZh: '释义' }] })).toBe('缺少词形');

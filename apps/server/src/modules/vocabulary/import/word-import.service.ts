@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   wordAiNotes,
   wordExamples,
@@ -75,14 +75,17 @@ export class WordImportService {
           .get();
 
         const wordId = existing?.id ?? randomUUID();
+        // 词条在多个词库间共享：已存在时与库内内容**合并**（并集去重），
+        // 避免后导入的词库覆盖先前内容导致释义/例句丢失。
+        const incoming = existing ? mergeWords(readExistingWord(tx, wordId), entry.word) : entry.word;
         if (existing) {
           tx.update(words)
             .set({
-              headword: entry.word.headword.trim(),
-              phoneticUk: entry.word.phoneticUk ?? null,
-              phoneticUs: entry.word.phoneticUs ?? null,
-              audioUkKey: entry.word.audioUkKey ?? null,
-              audioUsKey: entry.word.audioUsKey ?? null,
+              headword: incoming.headword.trim(),
+              phoneticUk: incoming.phoneticUk ?? null,
+              phoneticUs: incoming.phoneticUs ?? null,
+              audioUkKey: incoming.audioUkKey ?? null,
+              audioUsKey: incoming.audioUsKey ?? null,
               updatedAt: now,
             })
             .where(eq(words.id, wordId))
@@ -92,12 +95,12 @@ export class WordImportService {
           tx.insert(words)
             .values({
               id: wordId,
-              headword: entry.word.headword.trim(),
+              headword: incoming.headword.trim(),
               headwordCanonical: entry.canonical,
-              phoneticUk: entry.word.phoneticUk ?? null,
-              phoneticUs: entry.word.phoneticUs ?? null,
-              audioUkKey: entry.word.audioUkKey ?? null,
-              audioUsKey: entry.word.audioUsKey ?? null,
+              phoneticUk: incoming.phoneticUk ?? null,
+              phoneticUs: incoming.phoneticUs ?? null,
+              audioUkKey: incoming.audioUkKey ?? null,
+              audioUsKey: incoming.audioUsKey ?? null,
               source: 'imported',
               createdAt: now,
               updatedAt: now,
@@ -113,7 +116,7 @@ export class WordImportService {
         tx.delete(wordForms).where(eq(wordForms.wordId, wordId)).run();
         tx.delete(wordRelations).where(eq(wordRelations.wordId, wordId)).run();
 
-        entry.word.senses.slice(0, MAX_SENSES_PER_WORD).forEach((sense, order) => {
+        incoming.senses.slice(0, MAX_SENSES_PER_WORD).forEach((sense, order) => {
           tx.insert(wordSenses)
             .values({
               id: randomUUID(),
@@ -127,7 +130,7 @@ export class WordImportService {
             .run();
         });
 
-        (entry.word.examples ?? []).slice(0, MAX_EXAMPLES_PER_WORD).forEach((example, order) => {
+        (incoming.examples ?? []).slice(0, MAX_EXAMPLES_PER_WORD).forEach((example, order) => {
           tx.insert(wordExamples)
             .values({
               id: randomUUID(),
@@ -141,7 +144,7 @@ export class WordImportService {
             .run();
         });
 
-        (entry.word.phrases ?? []).slice(0, MAX_PHRASES_PER_WORD).forEach((phrase, order) => {
+        (incoming.phrases ?? []).slice(0, MAX_PHRASES_PER_WORD).forEach((phrase, order) => {
           tx.insert(wordPhrases)
             .values({
               id: randomUUID(),
@@ -154,13 +157,13 @@ export class WordImportService {
             .run();
         });
 
-        (entry.word.forms ?? []).slice(0, MAX_FORMS_PER_WORD).forEach((form) => {
+        (incoming.forms ?? []).slice(0, MAX_FORMS_PER_WORD).forEach((form) => {
           tx.insert(wordForms)
             .values({ id: randomUUID(), wordId, formType: form.formType, value: form.value })
             .run();
         });
 
-        (entry.word.relations ?? []).slice(0, MAX_RELATIONS_PER_WORD).forEach((relation) => {
+        (incoming.relations ?? []).slice(0, MAX_RELATIONS_PER_WORD).forEach((relation) => {
           tx.insert(wordRelations)
             .values({
               id: randomUUID(),
@@ -173,20 +176,20 @@ export class WordImportService {
         });
 
         // AI 补充内容单独一张表：只在来源提供时才写入，绝不触碰词典字段
-        if (entry.word.aiNotes) {
+        if (incoming.aiNotes) {
           tx.delete(wordAiNotes).where(eq(wordAiNotes.wordId, wordId)).run();
           tx.insert(wordAiNotes)
             .values({
               id: randomUUID(),
               wordId,
-              memoryTip: entry.word.aiNotes.memoryTip ?? null,
-              usageNote: entry.word.aiNotes.usageNote ?? null,
-              confusableNote: entry.word.aiNotes.confusableNote ?? null,
-              extraExamplesJson: entry.word.aiNotes.extraExamples
-                ? JSON.stringify(entry.word.aiNotes.extraExamples)
+              memoryTip: incoming.aiNotes.memoryTip ?? null,
+              usageNote: incoming.aiNotes.usageNote ?? null,
+              confusableNote: incoming.aiNotes.confusableNote ?? null,
+              extraExamplesJson: incoming.aiNotes.extraExamples
+                ? JSON.stringify(incoming.aiNotes.extraExamples)
                 : null,
-              provider: entry.word.aiNotes.provider ?? null,
-              model: entry.word.aiNotes.model ?? null,
+              provider: incoming.aiNotes.provider ?? null,
+              model: incoming.aiNotes.model ?? null,
               generatedAt: now,
             })
             .run();
@@ -202,8 +205,8 @@ export class WordImportService {
           .values({
             wordbookId: book.id,
             wordId,
-            rank: entry.word.rank ?? null,
-            tagsJson: entry.word.tags && entry.word.tags.length > 0 ? JSON.stringify(entry.word.tags) : null,
+            rank: incoming.rank ?? null,
+            tagsJson: incoming.tags && incoming.tags.length > 0 ? JSON.stringify(incoming.tags) : null,
           })
           .run();
       }
@@ -306,7 +309,7 @@ export function validateImportWord(word: ImportWordInput): string | null {
   const badRelation = (word.relations ?? []).find(
     (relation) =>
       !relation ||
-      !['synonym', 'antonym', 'confusable'].includes(relation.relationType) ||
+      !['synonym', 'antonym', 'confusable', 'derived'].includes(relation.relationType) ||
       (!relation.targetWordId && !relation.targetText?.trim()),
   );
   if (badRelation) return '存在不合法的词条关系';
@@ -364,5 +367,49 @@ export function mergeWords(base: ImportWordInput, extra: ImportWordInput): Impor
       (relation) => `${relation.relationType}|${relation.targetWordId ?? relation.targetText ?? ''}`,
     ),
     aiNotes: base.aiNotes ?? extra.aiNotes ?? null,
+  };
+}
+
+/** 读取库内已有的词条及其嵌套内容，转成导入中间格式，便于与新数据合并 */
+function readExistingWord(tx: DrizzleDb, wordId: string): ImportWordInput {
+  const word = tx.select().from(words).where(eq(words.id, wordId)).get();
+  const senses = tx.select().from(wordSenses).where(eq(wordSenses.wordId, wordId)).orderBy(asc(wordSenses.sortOrder)).all();
+  const examples = tx.select().from(wordExamples).where(eq(wordExamples.wordId, wordId)).orderBy(asc(wordExamples.sortOrder)).all();
+  const phrases = tx.select().from(wordPhrases).where(eq(wordPhrases.wordId, wordId)).orderBy(asc(wordPhrases.sortOrder)).all();
+  const forms = tx.select().from(wordForms).where(eq(wordForms.wordId, wordId)).all();
+  const relations = tx.select().from(wordRelations).where(eq(wordRelations.wordId, wordId)).all();
+  const ai = tx.select().from(wordAiNotes).where(eq(wordAiNotes.wordId, wordId)).get();
+
+  return {
+    headword: word?.headword ?? '',
+    phoneticUk: word?.phoneticUk ?? null,
+    phoneticUs: word?.phoneticUs ?? null,
+    audioUkKey: word?.audioUkKey ?? null,
+    audioUsKey: word?.audioUsKey ?? null,
+    rank: null,
+    tags: [],
+    senses: senses.map((s) => ({
+      partOfSpeech: s.partOfSpeech,
+      definitionZh: s.definitionZh,
+      definitionEn: s.definitionEn,
+      examMeaning: s.examMeaning,
+    })),
+    examples: examples.map((e) => ({ textEn: e.textEn, textZh: e.textZh })),
+    phrases: phrases.map((p) => ({ kind: p.kind, text: p.text, translation: p.translation })),
+    forms: forms.map((f) => ({ formType: f.formType, value: f.value })),
+    relations: relations.map((r) => ({
+      relationType: r.relationType as 'synonym' | 'antonym' | 'confusable' | 'derived',
+      targetWordId: r.targetWordId,
+      targetText: r.targetText,
+    })),
+    aiNotes: ai
+      ? {
+          memoryTip: ai.memoryTip,
+          usageNote: ai.usageNote,
+          confusableNote: ai.confusableNote,
+          provider: ai.provider,
+          model: ai.model,
+        }
+      : null,
   };
 }

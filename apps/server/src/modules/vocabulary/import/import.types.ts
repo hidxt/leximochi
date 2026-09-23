@@ -38,7 +38,7 @@ export interface ImportFormInput {
 }
 
 export interface ImportRelationInput {
-  relationType: 'synonym' | 'antonym' | 'confusable';
+  relationType: 'synonym' | 'antonym' | 'confusable' | 'derived';
   targetWordId?: string | null;
   targetText?: string | null;
 }

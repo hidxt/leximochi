@@ -11,7 +11,9 @@
     "lint": "eslint src test",
     "db:generate": "drizzle-kit generate",
     "create-admin": "node dist/scripts/create-admin.js",
-    "test:e2e": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand --testPathPattern e2e-spec"
+    "test:e2e": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand --testPathPattern e2e-spec",
+    "import:wordbook": "node --env-file-if-exists=.env dist/scripts/import-wordbook.js",
+    "fetch:dataset": "node scripts/fetch-wordbook-dataset.mjs"
   },
   "dependencies": {
     "@leximochi/core": "*",

@@ -160,9 +160,21 @@ export interface WordFormDto {
   value: string;
 }
 
+export const WordRelationType = {
+  Synonym: 'synonym',
+  Antonym: 'antonym',
+  Confusable: 'confusable',
+  /** 同根/派生词（如 abrupt → abruptly / abruptness） */
+  Derived: 'derived',
+} as const;
+
+export type WordRelationType = (typeof WordRelationType)[keyof typeof WordRelationType];
+
+export const WORD_RELATION_TYPES: readonly WordRelationType[] = Object.values(WordRelationType);
+
 export interface WordRelationDto {
   id: string;
-  relationType: 'synonym' | 'antonym' | 'confusable';
+  relationType: WordRelationType;
   targetWordId: string | null;
   targetText: string | null;
 }

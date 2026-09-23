@@ -8,9 +8,12 @@
 - 快照时间：2026-09-22
 - 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2 核心）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6 的**导入工具**部分。
 
-### 阻塞项（需用户决定）
-- **CET-4/CET-6 真实词库数据未导入**：用户指定的数据源 `KyleBing/english-vocabulary` **没有任何许可证**（无 LICENSE 文件、GitHub `license=null`、上游 `kajweb/dict` 同样无许可证，README 仅有「分享供学习」的表述）。按 `SECURITY-GUARDRAILS.md` 第 11 节与 `开发提示词.md` 的素材要求，「版权状态不明」的数据不得入库。核对结果与四种处置方案见 `docs/dataset-evaluation.md`。
-- 影响：Task 7 之后的学习/复习链路可先用自制小样本数据端到端验证，但**完整词表需等授权或改用有许可证的数据源**。
+### 词库数据现状（Task 6 完成）
+- **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
+- **数据不入 Git**：采用「下载 + 导入」流程 —— `npm run fetch:dataset -w @leximochi/server`（代理优先、失败直连，落地 `data/imports/`）+ `npm run import:wordbook -w @leximochi/server -- --file … --key … --name … --system`。
+- **已导入本地开发库**（`apps/server/data/db/leximochi.sqlite`）：`cet4` 4,544 词 / `cet6` 3,991 词（共 6,662 唯一词条，含 1,873 个跨库共享词）、释义 14,092、例句 14,504、短语 48,674、关系 48,206；`word_ai_notes` 为 0（仅词典数据）。
+- **已修复的导入缺陷**：`descCn` 标签被误当英文释义（已清库重导，`definition_en` 计数为 0）；跨词库覆盖共享词导致丢释义（改为并集合并，并加了回归用例）。
+- **已知限制**：来源无音频文件（`audio_*_key` 全为空，音标可用但发音待另寻授权音频源或 Phase 5 TTS）；未映射 `realExamSentence`/`exam`/`remMethod`/词形变化；反义词覆盖较低。
 - 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）。Phase 2 尚在服务端与共享包阶段，四端界面未开始改造
 
 ---

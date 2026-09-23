@@ -73,7 +73,7 @@ export const wordRelations = sqliteTable(
     wordId: text('word_id')
       .notNull()
       .references(() => words.id, { onDelete: 'cascade' }),
-    relationType: text('relation_type', { enum: ['synonym', 'antonym', 'confusable'] }).notNull(),
+    relationType: text('relation_type', { enum: ['synonym', 'antonym', 'confusable', 'derived'] }).notNull(),
     targetWordId: text('target_word_id').references(() => words.id, { onDelete: 'set null' }),
     targetText: text('target_text'),
   },
