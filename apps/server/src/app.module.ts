@@ -14,6 +14,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
+import { LearningModule } from './modules/learning/learning.module';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     UsersModule,
     AuthModule,
     VocabularyModule,
+    LearningModule,
     AdminModule,
     HealthModule,
   ],

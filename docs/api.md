@@ -231,3 +231,47 @@
 说明：
 - 音频只以 `StorageProvider` 的 key 形式返回（如 `words/uk/xxx.mp3`），**绝不返回服务器绝对路径**；播放地址由后续鉴权接口换取。
 - 错误：未知词库 `404 WORDBOOK_NOT_FOUND`、未知词条 `404 WORD_NOT_FOUND`；未登录 `401`。
+
+---
+
+## 8. 学习与复习（Phase 2，需登录）
+
+### POST /review/submit
+
+提交一次答题。**判定与调度完全由服务端完成**：客户端只提交「答题事实」。
+
+请求：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `eventId` | string(8–64) | **幂等键**，客户端生成；网络重试/离线补传必须复用同一个值 |
+| `wordId` | string(1–64) | 词条 ID |
+| `questionType` | enum | `definition_choice` / `en_to_zh` / `zh_to_en` / `spelling` / `listening_dictation` |
+| `answer` | string(≤200) | 用户原始输入（文本或选项内容） |
+| `durationMs` | int(0–600000) | 答题用时，仅用于映射评分 |
+| `clientAnsweredAt` | int | 可选，仅作分析记录，**不参与业务判定** |
+
+响应（200）：
+
+```json
+{ "data": {
+  "correct": true,
+  "correctAnswer": "abandon",
+  "rating": "good",
+  "state": { "status": "learning", "easeFactor": 2.5, "intervalDays": 1, "repetitions": 1,
+             "lapses": 0, "dueAt": 1790000000000, "lastReviewedAt": 1790000000000,
+             "totalReviews": 1, "correctReviews": 1 },
+  "spellingErrors": []
+} }
+```
+
+服务端规则：
+
+- **评分映射**（客户端不可提交评分）：答错 → `again`；答对且用时 ≤3s → `easy`；≥8s → `hard`；其余 → `good`。
+- **SM-2 更新**：`again` 重置重复次数、遗忘计数 +1、10 分钟后可再练；`good` 第 1/2 次间隔为 1/6 天、之后按难度因子放大；`easy` 为 3/8 天并提升难度；`hard` 间隔 ×1.2 并降低难度；难度因子限制在 1.3–3.0。
+- **幂等**：同一 `eventId` 重复提交不会二次推进学习状态，也不重复写流水（以 `review_logs.event_id` 唯一约束兜底）；重试返回与首次一致的结果。
+- **留痕**：每次提交写入 `review_logs`，包含评分后的 `easeFactor`/`intervalDays`/`repetitions`/`dueAt`，供未来迁移 FSRS。
+- **错拼记录**：拼写/听写答错时按形态分类（`missing_letter`/`duplicate_letter`/`order_error`/`wrong_letter`）写入 `spelling_errors`，用于提高该词后续出现权重。
+- **不可信输入**：请求体中的 `rating`/`easeFactor`/`intervalDays` 等字段会被 DTO 白名单直接拒绝（400）。
+
+错误：`404 WORD_NOT_FOUND`、`400 VALIDATION_FAILED`、未登录 `401`。

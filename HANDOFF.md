@@ -6,7 +6,7 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-22
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2 核心）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6 的**导入工具**部分。
+- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6（词库导入，CET-4/6 已入本地库）、Task 7（复习落库与幂等）。
 
 ### 词库数据现状（Task 6 完成）
 - **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
@@ -130,6 +130,7 @@ leximochi/
 | GET | `/wordbooks/:key/words` | 需登录 | 分页导出完整词条（离线学习），limit ≤ 200 |
 | GET | `/words/search` | 需登录 | 按词形搜索（LIKE 通配符已转义） |
 | GET | `/words/:id` | 需登录 | 词条详情（词典数据 + 独立 AI 补充 + 我的学习状态） |
+| POST | `/review/submit` | 需登录 | 提交答题：服务端判定对错、映射评分、SM-2 调度并落库；`eventId` 幂等 |
 | POST | `/auth/captcha` | 公开 | 签发算术挑战（HMAC 签名、TTL 120s、一次性、绑定 IP） |
 | POST | `/auth/register` | 公开 | 注册，返回用户与一次性 10 个恢复码 |
 | POST | `/auth/login` | 公开 | Web 走 Cookie / 移动端（`x-client-type: mobile`）走 Body |
@@ -201,7 +202,7 @@ leximochi/
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 18 suites / 126 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 8） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `npm test -w @leximochi/server` | 20 suites / 161 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 10、答案判定 12、复习落库与幂等 12、来源转换 9） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
 | `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |
