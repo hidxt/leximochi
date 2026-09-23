@@ -8,11 +8,23 @@ import { reviewLogs, spellingErrors, userWordStates } from '../../database/schem
 import type {
   ApplyReviewInput,
   ApplyReviewResult,
+  DailyTrendPoint,
   LearningRepository,
+  ReviewHistoryCursor,
+  ReviewHistoryRecord,
   ReviewLogRecord,
+  ReviewStatsRecord,
   SpellingErrorGroupRecord,
   UserWordStateRecord,
 } from '../../modules/learning/domain/learning.repository';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** 学习统计趋势窗口：含今日共 7 天 */
+const TREND_DAYS = 7;
+
+function startOfUtcDay(timestamp: number): number {
+  return Math.floor(timestamp / DAY_MS) * DAY_MS;
+}
 
 @Injectable()
 export class DrizzleLearningRepository implements LearningRepository {
@@ -300,6 +312,154 @@ export class DrizzleLearningRepository implements LearningRepository {
       .prepare('SELECT COUNT(DISTINCT word_id) AS count FROM spelling_errors WHERE user_id = ?')
       .get(userId) as { count: number } | undefined;
     return Number(row?.count ?? 0);
+  }
+
+  async listReviewHistory(
+    userId: string,
+    page: { cursor?: ReviewHistoryCursor; limit: number },
+  ): Promise<{ items: ReviewHistoryRecord[]; nextCursor: ReviewHistoryCursor | null }> {
+    const limit = page.limit;
+    const cursor = page.cursor;
+    const rows = (
+      cursor
+        ? this.database.sqlite
+            .prepare(
+              `SELECT rl.id, rl.word_id AS wordId, w.headword AS headword,
+                      rl.question_type AS questionType, rl.is_correct AS isCorrect,
+                      rl.rating AS rating, rl.duration_ms AS durationMs, rl.answered_at AS answeredAt
+               FROM review_logs rl
+               JOIN words w ON w.id = rl.word_id
+               WHERE rl.user_id = ?
+                 AND (rl.answered_at < ? OR (rl.answered_at = ? AND rl.id < ?))
+               ORDER BY rl.answered_at DESC, rl.id DESC
+               LIMIT ?`,
+            )
+            .all(userId, cursor.answeredAt, cursor.answeredAt, cursor.id, limit + 1)
+        : this.database.sqlite
+            .prepare(
+              `SELECT rl.id, rl.word_id AS wordId, w.headword AS headword,
+                      rl.question_type AS questionType, rl.is_correct AS isCorrect,
+                      rl.rating AS rating, rl.duration_ms AS durationMs, rl.answered_at AS answeredAt
+               FROM review_logs rl
+               JOIN words w ON w.id = rl.word_id
+               WHERE rl.user_id = ?
+               ORDER BY rl.answered_at DESC, rl.id DESC
+               LIMIT ?`,
+            )
+            .all(userId, limit + 1)
+    ) as Array<{
+      id: string;
+      wordId: string;
+      headword: string;
+      questionType: string;
+      isCorrect: number;
+      rating: string;
+      durationMs: number;
+      answeredAt: number;
+    }>;
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const last = pageRows[pageRows.length - 1];
+    return {
+      items: pageRows.map((row) => ({
+        id: row.id,
+        wordId: row.wordId,
+        headword: row.headword,
+        questionType: row.questionType as QuestionType,
+        isCorrect: row.isCorrect === 1,
+        rating: row.rating as ReviewRating,
+        durationMs: Number(row.durationMs),
+        answeredAt: Number(row.answeredAt),
+      })),
+      nextCursor: hasMore && last ? { answeredAt: Number(last.answeredAt), id: last.id } : null,
+    };
+  }
+
+  async getReviewStats(userId: string, now: number): Promise<ReviewStatsRecord> {
+    const dayStart = startOfUtcDay(now);
+    const trendStart = dayStart - (TREND_DAYS - 1) * DAY_MS;
+    const sqlite = this.database.sqlite;
+    const scalar = (statement: string, ...params: unknown[]): number => {
+      const row = sqlite.prepare(statement).get(...(params as never[])) as
+        | { value: number | null }
+        | undefined;
+      return Number(row?.value ?? 0);
+    };
+
+    const answeredToday = scalar(
+      'SELECT COUNT(*) AS value FROM review_logs WHERE user_id = ? AND answered_at >= ?',
+      userId,
+      dayStart,
+    );
+    const correctToday = scalar(
+      'SELECT COUNT(*) AS value FROM review_logs WHERE user_id = ? AND answered_at >= ? AND is_correct = 1',
+      userId,
+      dayStart,
+    );
+    const averageDurationMsToday = scalar(
+      'SELECT CAST(AVG(duration_ms) AS INTEGER) AS value FROM review_logs WHERE user_id = ? AND answered_at >= ?',
+      userId,
+      dayStart,
+    );
+    const masteredWords = scalar(
+      "SELECT COUNT(*) AS value FROM user_word_states WHERE user_id = ? AND status = 'mastered'",
+      userId,
+    );
+    const learningWords = scalar(
+      "SELECT COUNT(*) AS value FROM user_word_states WHERE user_id = ? AND status IN ('learning','review')",
+      userId,
+    );
+    const notebookCount = scalar(
+      'SELECT COUNT(*) AS value FROM user_notebook WHERE user_id = ?',
+      userId,
+    );
+
+    const newWordRows = sqlite
+      .prepare(
+        `SELECT CAST(first_learned_at / ? AS INTEGER) AS day, COUNT(*) AS count
+         FROM user_word_states
+         WHERE user_id = ? AND first_learned_at >= ?
+         GROUP BY day`,
+      )
+      .all(DAY_MS, userId, trendStart) as Array<{ day: number; count: number }>;
+
+    // 复习量只统计「当天之前就已学过」的词的作答，避免与新学首答重复计数
+    const reviewRows = sqlite
+      .prepare(
+        `SELECT CAST(rl.answered_at / ? AS INTEGER) AS day, COUNT(*) AS count
+         FROM review_logs rl
+         JOIN user_word_states s ON s.user_id = rl.user_id AND s.word_id = rl.word_id
+         WHERE rl.user_id = ? AND rl.answered_at >= ?
+           AND s.first_learned_at < CAST(rl.answered_at / ? AS INTEGER) * ?
+         GROUP BY day`,
+      )
+      .all(DAY_MS, userId, trendStart, DAY_MS, DAY_MS) as Array<{ day: number; count: number }>;
+
+    const newByDay = new Map(newWordRows.map((row) => [Number(row.day), Number(row.count)]));
+    const reviewByDay = new Map(reviewRows.map((row) => [Number(row.day), Number(row.count)]));
+    const dailyTrend: DailyTrendPoint[] = [];
+    for (let index = 0; index < TREND_DAYS; index += 1) {
+      const day = Math.floor(trendStart / DAY_MS) + index;
+      dailyTrend.push({
+        date: new Date(day * DAY_MS).toISOString().slice(0, 10),
+        newWords: newByDay.get(day) ?? 0,
+        reviews: reviewByDay.get(day) ?? 0,
+      });
+    }
+
+    return {
+      answeredToday,
+      correctToday,
+      // 没有作答时返回 null，避免前端把 0 当作「平均用时 0 秒」
+      averageDurationMsToday: answeredToday > 0 ? averageDurationMsToday : null,
+      learnedToday: await this.countNewLearnedSince(userId, dayStart),
+      reviewedToday: await this.countReviewsSince(userId, dayStart),
+      masteredWords,
+      learningWords,
+      notebookCount,
+      dailyTrend,
+    };
   }
 }
 

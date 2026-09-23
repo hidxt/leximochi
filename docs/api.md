@@ -350,3 +350,65 @@
 - 选择题干扰项来自**其他词条**的释义并去重；输入型题目的题干与选项**绝不包含答案词形**。
 - 复习题题型按词条 ID 稳定轮换，保证同一词多次练习时题型可预期。
 - `progress.newRemaining` 表示该词库**还剩多少没学过的词**；每日目标进度由 `learnedToday` / `dailyNewTarget` 表达。
+
+### GET /review/history
+
+复习历史分页，按答题时间倒序（同一毫秒按记录 ID 倒序稳定排序），仅返回当前用户自己的记录。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `cursor` | string? | 上一页返回的 `nextCursor`（对客户端不透明；非法值返回 400） |
+| `limit` | int? | 每页条数，默认 30，范围 1–100 |
+
+```json
+{ "data": {
+  "items": [
+    { "id": "uuid", "wordId": "uuid", "headword": "abruptly", "questionType": "spelling",
+      "isCorrect": false, "rating": "again", "durationMs": 6000, "answeredAt": 1790000000000 }
+  ],
+  "nextCursor": null
+} }
+```
+
+### GET /review/stats
+
+学习统计。全部数值由服务端聚合，客户端不参与计算。
+
+```json
+{ "data": {
+  "learnedToday": 2, "reviewedToday": 0, "correctToday": 1, "accuracyToday": 0.5,
+  "averageDurationMsToday": 3600, "masteredWords": 0, "learningWords": 2, "notebookCount": 1,
+  "dailyTrend": [ { "date": "2026-09-17", "newWords": 0, "reviews": 0 } ]
+} }
+```
+
+- `learnedToday`：今日**首次学习**的词数；`reviewedToday`：今日复习次数（不含当天首次学习的那次作答）。
+- `correctToday` / `accuracyToday`：按**今日全部作答**（含新学首答）计算；无作答时 `accuracyToday` 与 `averageDurationMsToday` 均为 `null`，不用 0 冒充。
+- `learningWords`：`learning` + `review` 状态的词数；`masteredWords`：`mastered` 状态词数。
+- `dailyTrend`：近 7 天（含今日，UTC 日期）升序，固定 7 条，空缺日期补 0。
+
+## 9. 生词本（Phase 2，需登录）
+
+所有操作以当前登录用户为范围；访问他人条目一律按「不存在」处理（404），不泄露他人数据是否存在。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/notebook?cursor=&limit=` | 分页列表（按加入时间倒序），`limit` 默认 30、上限 100 |
+| POST | `/notebook` | 加入生词本（**幂等**：重复加入返回既有条目且 `created=false`，不覆盖原备注） |
+| DELETE | `/notebook/:wordId` | 移除自己的条目；不存在或非本人返回 404 `NOTEBOOK_ENTRY_NOT_FOUND` |
+
+POST 请求：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `wordId` | string(≤64) | 词条 ID；不存在返回 404 `WORD_NOT_FOUND` |
+| `note` | string?(≤200) | 个人备注 |
+| `source` | enum? | `manual`（默认）/ `from_review` / `from_listening` |
+
+```json
+{ "data": {
+  "created": true,
+  "entry": { "wordId": "uuid", "headword": "abandon", "definitionZh": "放弃；抛弃",
+             "note": null, "source": "manual", "addedAt": 1790000000000 }
+} }
+```

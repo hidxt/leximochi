@@ -1,6 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
-import type { SpellingErrorSummary, SubmitReviewResponse } from '@leximochi/types';
+import type {
+  ReviewHistoryPage,
+  ReviewStats,
+  SpellingErrorSummary,
+  SubmitReviewResponse,
+} from '@leximochi/types';
 import { CurrentUser, type AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { HistoryQueryDto } from './dto/history-query.dto';
 import { SpellingErrorsQueryDto } from './dto/spelling-errors.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 import { LearningService } from './learning.service';
@@ -39,5 +45,20 @@ export class LearningController {
         query.limit ?? DEFAULT_SPELLING_LIST_LIMIT,
       ),
     };
+  }
+
+  /** 复习历史分页（按答题时间倒序，仅本人记录） */
+  @Get('history')
+  async history(
+    @Query() query: HistoryQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ data: ReviewHistoryPage }> {
+    return { data: await this.learning.listHistory(user.userId, query) };
+  }
+
+  /** 学习统计：今日量、正确率、平均用时、状态分布、近 7 日趋势 */
+  @Get('stats')
+  async stats(@CurrentUser() user: AuthenticatedUser): Promise<{ data: ReviewStats }> {
+    return { data: await this.learning.getStats(user.userId) };
   }
 }

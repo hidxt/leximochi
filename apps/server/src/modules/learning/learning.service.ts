@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   ErrorCode,
   QuestionType,
+  type ReviewHistoryPage,
+  type ReviewStats,
   type SpellingErrorSummary,
   type SpellingErrorSummaryItem,
   type SubmitReviewResponse,
@@ -20,6 +22,7 @@ import {
   type WordRepository,
 } from '../vocabulary/domain/word.repository';
 import { checkAnswer, classifySpellingError } from './answer-checker';
+import { formatHistoryCursor, parseHistoryCursor } from './history-cursor';
 import {
   LEARNING_REPOSITORY,
   type LearningRepository,
@@ -31,6 +34,13 @@ const SPELLING_TYPES: ReadonlySet<QuestionType> = new Set([
   QuestionType.Spelling,
   QuestionType.ListeningDictation,
 ]);
+
+const DEFAULT_HISTORY_LIMIT = 30;
+
+export interface ListHistoryQuery {
+  cursor?: string;
+  limit?: number;
+}
 
 export interface SubmitReviewCommand {
   eventId: string;
@@ -161,6 +171,41 @@ export class LearningService {
       lastAt: group.lastAt,
     }));
     return { items, total };
+  }
+
+  /** 复习历史分页（按答题时间倒序），仅当前用户自己的记录 */
+  async listHistory(userId: string, query: ListHistoryQuery): Promise<ReviewHistoryPage> {
+    const cursor = query.cursor ? parseHistoryCursor(query.cursor) : undefined;
+    const page = await this.learning.listReviewHistory(userId, {
+      cursor,
+      limit: query.limit ?? DEFAULT_HISTORY_LIMIT,
+    });
+    return {
+      items: page.items,
+      nextCursor: page.nextCursor ? formatHistoryCursor(page.nextCursor) : null,
+    };
+  }
+
+  /**
+   * 学习统计。所有数值都由服务端聚合得出：
+   * 正确率与平均用时按「今日全部作答」计算（含新学首答），趋势按 UTC 日期分 7 天。
+   */
+  async getStats(userId: string): Promise<ReviewStats> {
+    const record = await this.learning.getReviewStats(userId, Date.now());
+    return {
+      learnedToday: record.learnedToday,
+      reviewedToday: record.reviewedToday,
+      correctToday: record.correctToday,
+      accuracyToday:
+        record.answeredToday > 0
+          ? Number((record.correctToday / record.answeredToday).toFixed(4))
+          : null,
+      averageDurationMsToday: record.averageDurationMsToday,
+      masteredWords: record.masteredWords,
+      learningWords: record.learningWords,
+      notebookCount: record.notebookCount,
+      dailyTrend: record.dailyTrend,
+    };
   }
 }
 

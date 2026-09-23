@@ -337,16 +337,31 @@ export interface SpellingErrorSummary {
 
 // ---------- 生词本 ----------
 
+export const NotebookSource = {
+  Manual: 'manual',
+  FromReview: 'from_review',
+  FromListening: 'from_listening',
+} as const;
+
+export type NotebookSource = (typeof NotebookSource)[keyof typeof NotebookSource];
+
 export interface NotebookEntry {
   wordId: string;
   headword: string;
+  /** 首条中文释义，便于列表展示 */
   definitionZh: string | null;
   note: string | null;
-  source: ContentSource;
+  source: NotebookSource;
   addedAt: number;
 }
 
 export interface NotebookPage {
   items: NotebookEntry[];
   nextCursor: string | null;
+}
+
+export interface NotebookAddResponse {
+  entry: NotebookEntry;
+  /** false 表示该词已在生词本中（幂等命中，不重复写入） */
+  created: boolean;
 }

@@ -81,6 +81,44 @@ export interface SpellingErrorGroupRecord {
   lastAt: number;
 }
 
+export interface ReviewHistoryRecord {
+  id: string;
+  wordId: string;
+  headword: string;
+  questionType: QuestionType;
+  isCorrect: boolean;
+  rating: ReviewRating;
+  durationMs: number;
+  answeredAt: number;
+}
+
+/** 复习历史分页游标：按 (answeredAt DESC, id DESC) 排序 */
+export interface ReviewHistoryCursor {
+  answeredAt: number;
+  id: string;
+}
+
+export interface DailyTrendPoint {
+  /** UTC 日期（YYYY-MM-DD） */
+  date: string;
+  newWords: number;
+  reviews: number;
+}
+
+/** 学习统计的原始聚合结果（服务端唯一权威，客户端不参与计算） */
+export interface ReviewStatsRecord {
+  answeredToday: number;
+  correctToday: number;
+  averageDurationMsToday: number | null;
+  learnedToday: number;
+  reviewedToday: number;
+  masteredWords: number;
+  learningWords: number;
+  notebookCount: number;
+  /** 近 7 日（含今日，按 UTC 日期）趋势，时间升序 */
+  dailyTrend: DailyTrendPoint[];
+}
+
 export interface LearningRepository {
   findState(userId: string, wordId: string): Promise<UserWordStateRecord | null>;
   /** 原子写入一次复习：幂等判定 + 状态推进 + 流水 + 错拼记录在同一事务内 */
@@ -101,4 +139,11 @@ export interface LearningRepository {
   listSpellingErrorGroups(userId: string, limit: number): Promise<SpellingErrorGroupRecord[]>;
   /** 错拼过的词条总数（用于清单分页展示） */
   countSpellingErrorGroups(userId: string): Promise<number>;
+  /** 复习历史分页（按答题时间倒序，含词形） */
+  listReviewHistory(
+    userId: string,
+    page: { cursor?: ReviewHistoryCursor; limit: number },
+  ): Promise<{ items: ReviewHistoryRecord[]; nextCursor: ReviewHistoryCursor | null }>;
+  /** 学习统计聚合（今日量、正确率、平均用时、状态分布、近 7 日趋势） */
+  getReviewStats(userId: string, now: number): Promise<ReviewStatsRecord>;
 }

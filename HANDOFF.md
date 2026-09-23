@@ -6,7 +6,7 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-23
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6（词库导入，CET-4/6 已入本地库）、Task 7（复习落库与幂等）、Task 8（出题与选词）、Task 9（拼写与听写：错拼惩罚接入 + 错拼清单）。剩余 Task 10–16。
+- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6（词库导入，CET-4/6 已入本地库）、Task 7（复习落库与幂等）、Task 8（出题与选词）、Task 9（拼写与听写）、Task 10（生词本）、Task 11（学习历史与统计）。剩余 Task 12–16。
 
 ### 词库数据现状（Task 6 完成）
 - **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
@@ -133,6 +133,11 @@ leximochi/
 | POST | `/review/submit` | 需登录 | 提交答题：服务端判定对错、映射评分、SM-2 调度并落库；`eventId` 幂等 |
 | POST | `/study/next` | 需登录 | 取下一题（新词/复习/拼写/听写）：选词策略 + 出题，题目不含答案 |
 | GET | `/review/spelling-errors` | 需登录 | 错拼清单：按词聚合错拼次数/分类（仅本人数据，`limit` ≤ 100） |
+| GET | `/review/history` | 需登录 | 复习历史分页（答题时间倒序，游标不透明） |
+| GET | `/review/stats` | 需登录 | 学习统计：今日量/正确率/平均用时/状态分布/近 7 日趋势 |
+| GET | `/notebook` | 需登录 | 生词本分页列表（加入时间倒序） |
+| POST | `/notebook` | 需登录 | 加入生词本（幂等，`created` 标识是否新建） |
+| DELETE | `/notebook/:wordId` | 需登录 | 移除自己的生词本条目（他人条目 404） |
 | POST | `/auth/captcha` | 公开 | 签发算术挑战（HMAC 签名、TTL 120s、一次性、绑定 IP） |
 | POST | `/auth/register` | 公开 | 注册，返回用户与一次性 10 个恢复码 |
 | POST | `/auth/login` | 公开 | Web 走 Cookie / 移动端（`x-client-type: mobile`）走 Body |
@@ -164,8 +169,8 @@ leximochi/
 ## 8. 已完成 / 进行中 / 未完成
 
 ### Phase 2 进度（计划 `docs/plans/2026-09-22-phase-2-vocabulary.md`）
-- ✅ Task 1–9：SM-2 核心（`packages/core/src/sm2.ts`）、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单。
-- ⬜ Task 10 生词本 → Task 11 学习历史与统计 → Task 12 管理后台词库接口 → Task 13 Web 单词模块 → Task 14 Admin 词库管理 → Task 15 Android 单词模块 → Task 16 Phase 2 验收。
+- ✅ Task 1–11：SM-2 核心（`packages/core/src/sm2.ts`）、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单、生词本 `/notebook`、学习历史与统计 `/review/history`、`/review/stats`。
+- ⬜ Task 12 管理后台词库接口 → Task 13 Web 单词模块 → Task 14 Admin 词库管理 → Task 15 Android 单词模块 → Task 16 Phase 2 验收。
 
 ### Phase 1（已完成，历史）
 - Monorepo 地基、`@leximochi/types|core|shared|api-client|auth`、服务端骨架与数据库层、账号/登录/恢复码/RBAC、`apps/web`、`apps/admin`、`apps/mobile`（APK 构建通过）、`docs/phase-1-acceptance.md`。
@@ -181,14 +186,14 @@ leximochi/
 | `npm install` | 成功（root + 全部 workspace） |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | exit 0：服务端 176、core 33、types 10、api-client 7、auth 7、admin 6、web 4、mobile 2（合计 **245 个用例**） |
+| `npm test` | exit 0：服务端 201、core 33、types 10、api-client 7、auth 7、admin 6、web 4、mobile 2（合计 **270 个用例**） |
 | `npm run build` | exit 0 |
 
 ### 服务端专项
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 23 suites / 176 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 10、答案判定 12、复习落库与幂等 12、来源转换 9、出题与选词 9、拼写与听写 6） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `npm test -w @leximochi/server` | 26 suites / 201 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 10、答案判定 12、复习落库与幂等 12、来源转换 9、出题与选词 9、拼写与听写 6、生词本 11、生词本游标 7、学习历史与统计 7） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
 | `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |
