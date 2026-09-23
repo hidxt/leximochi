@@ -212,3 +212,13 @@ export interface StorageProvider {
 - 学习积分、金币、宠物 EXP、连续学习、Reward Ledger（Phase 3）。
 - 听力内容与模考（Phase 4）、AI 口语与 TTS 生成音频（Phase 5）、勋章与通知（Phase 6）、离线同步队列与冲突处理（Phase 7，Phase 2 只做「已下载词库的本地读取」）。
 - 每日学习目标设置界面（Phase 3；Phase 2 用服务端默认值：新词 20/天、复习不限）。
+
+---
+
+## 8. 实施偏差记录
+
+| # | 计划内容 | 实际实现 | 原因 |
+| --- | --- | --- | --- |
+| D1 | Task 9 只列「错拼分类 + 加权复习」，未列出查询接口 | 增加 `GET /review/spelling-errors`（按词聚合错拼次数与分类，`total` 为错拼词条总数，`limit` ≤ 100） | 「错拼清单/统计给用户看」需要服务端出口；放在 Task 9 而非 Task 11（后者是学习历史与整体统计） |
+| D2 | 「错拼后 7 天内提高该词的出现权重」写成散文描述 | 在 `packages/core/src/sm2.ts` 导出常量 `MISSPELL_PRIORITY_WINDOW_DAYS = 7`，`StudyService` 引用它；删除原型期的函数 `spellingPriorityBoostDays`（无调用方，避免出现第二个「7 天」来源） | DRY + 避免死代码；跨端共用同一常量 |
+| D3 | 计划未说明错拼惩罚与「答错」惩罚的叠加顺序 | 先 `applySpellingPenalty` 降难度，再 `applySm2` 计算调度；两者独立累减，下限仍为 1.3 | 顺序影响难度下限的钳制次数，固定为先惩罚后调度并写入注释与测试（`spelling-training.e2e-spec.ts` 断言 2.2 / 2.3 / 2.07） |

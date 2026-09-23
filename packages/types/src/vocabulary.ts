@@ -70,6 +70,12 @@ export const SpellingErrorType = {
 
 export type SpellingErrorType = (typeof SpellingErrorType)[keyof typeof SpellingErrorType];
 
+const SPELLING_ERROR_TYPES: ReadonlySet<string> = new Set(Object.values(SpellingErrorType));
+
+export function isSpellingErrorType(value: string): value is SpellingErrorType {
+  return SPELLING_ERROR_TYPES.has(value);
+}
+
 export const AccentVariant = {
   Uk: 'uk',
   Us: 'us',
@@ -308,6 +314,25 @@ export interface ReviewStats {
   notebookCount: number;
   /** 近 7 日（含今日）的每日学习量，按 UTC 日期分组 */
   dailyTrend: Array<{ date: string; newWords: number; reviews: number }>;
+}
+
+// ---------- 错拼清单（拼写/听写训练反馈） ----------
+
+export interface SpellingErrorSummaryItem {
+  wordId: string;
+  headword: string;
+  /** 最近一次的错误输入（供用户回看自己错在哪） */
+  lastActual: string;
+  /** 各类错拼累计次数 */
+  errorCounts: Record<SpellingErrorType, number>;
+  totalCount: number;
+  firstAt: number;
+  lastAt: number;
+}
+
+export interface SpellingErrorSummary {
+  items: SpellingErrorSummaryItem[];
+  total: number;
 }
 
 // ---------- 生词本 ----------

@@ -8,6 +8,7 @@ import {
   type StudyQuestionDto,
 } from '@leximochi/types';
 import { DEFAULT_DAILY_NEW_TARGET } from '@leximochi/types';
+import { MISSPELL_PRIORITY_WINDOW_DAYS } from '@leximochi/core';
 import { AppError } from '../../common/errors/app-error';
 import {
   WORDBOOK_REPOSITORY,
@@ -27,7 +28,7 @@ import { buildQuestion, hasAudio, pickReviewQuestionType } from './question-fact
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REVIEW_CANDIDATE_LIMIT = 50;
-const RECENT_MISSPELL_WINDOW_MS = 7 * DAY_MS;
+const RECENT_MISSPELL_WINDOW_MS = MISSPELL_PRIORITY_WINDOW_DAYS * DAY_MS;
 const DISTRACTOR_POOL = 30;
 const OPTION_COUNT = 4;
 

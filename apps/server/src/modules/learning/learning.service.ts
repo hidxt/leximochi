@@ -2,10 +2,18 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   ErrorCode,
   QuestionType,
+  type SpellingErrorSummary,
+  type SpellingErrorSummaryItem,
   type SubmitReviewResponse,
   type WordStateDto,
 } from '@leximochi/types';
-import { INITIAL_SM2_STATE, applySm2, mapAnswerToRating, type Sm2State } from '@leximochi/core';
+import {
+  INITIAL_SM2_STATE,
+  applySm2,
+  applySpellingPenalty,
+  mapAnswerToRating,
+  type Sm2State,
+} from '@leximochi/core';
 import { AppError } from '../../common/errors/app-error';
 import {
   WORD_REPOSITORY,
@@ -70,6 +78,14 @@ export class LearningService {
     const rating = mapAnswerToRating({ isCorrect: checked.correct, durationMs: command.durationMs });
     const answeredAt = Date.now();
 
+    // 错拼分类只在拼写/听写题答错时产生，并且必须先于调度计算：
+    // 除「答错」本身的难度惩罚外，漏字母/顺序错误等再额外降低难度，
+    // 这些词后续会出现得更早（见 StudyService 的错拼加权选词）。
+    const spellingErrorTypes =
+      !checked.correct && SPELLING_TYPES.has(command.questionType)
+        ? classifySpellingError(word.headword, command.answer)
+        : [];
+
     const current = await this.learning.findState(context.userId, command.wordId);
     const sm2State: Sm2State = current
       ? {
@@ -80,12 +96,7 @@ export class LearningService {
           status: current.status,
         }
       : INITIAL_SM2_STATE;
-    const next = applySm2(sm2State, rating, answeredAt);
-
-    const spellingErrorTypes =
-      !checked.correct && SPELLING_TYPES.has(command.questionType)
-        ? classifySpellingError(word.headword, command.answer)
-        : [];
+    const next = applySm2(applySpellingPenalty(sm2State, spellingErrorTypes), rating, answeredAt);
 
     const result = await this.learning.applyReview({
       userId: context.userId,
@@ -132,6 +143,24 @@ export class LearningService {
       state: toStateDto(result.state),
       spellingErrors: spellingErrorTypes,
     };
+  }
+
+  /** 错拼清单：只返回当前用户自己的错拼记录聚合（按最近错拼时间倒序） */
+  async listSpellingErrors(userId: string, limit: number): Promise<SpellingErrorSummary> {
+    const [groups, total] = await Promise.all([
+      this.learning.listSpellingErrorGroups(userId, limit),
+      this.learning.countSpellingErrorGroups(userId),
+    ]);
+    const items: SpellingErrorSummaryItem[] = groups.map((group) => ({
+      wordId: group.wordId,
+      headword: group.headword,
+      lastActual: group.lastActual,
+      errorCounts: group.errorCounts,
+      totalCount: group.totalCount,
+      firstAt: group.firstAt,
+      lastAt: group.lastAt,
+    }));
+    return { items, total };
   }
 }
 

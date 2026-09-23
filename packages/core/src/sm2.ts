@@ -181,7 +181,5 @@ export function applySpellingPenalty(state: Sm2State, errorTypes: SpellingErrorT
   return { ...state, easeFactor: clampEase(state.easeFactor - total) };
 }
 
-/** 错拼后应在近期内更早再次出现（天数越小出现越早），仅用于查询排序加权 */
-export function spellingPriorityBoostDays(errorTypes: SpellingErrorType[]): number {
-  return errorTypes.length > 0 ? 7 : 0;
-}
+/** 错拼后应更早再次出现的窗口（天）：查询侧按此窗口做出现权重加权，不额外建表 */
+export const MISSPELL_PRIORITY_WINDOW_DAYS = 7;

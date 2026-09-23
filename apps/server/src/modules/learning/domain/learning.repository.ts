@@ -70,6 +70,17 @@ export interface ApplyReviewResult {
   state: UserWordStateRecord;
 }
 
+/** 按词条聚合的错拼统计（拼写/听写训练反馈） */
+export interface SpellingErrorGroupRecord {
+  wordId: string;
+  headword: string;
+  lastActual: string;
+  errorCounts: Record<SpellingErrorType, number>;
+  totalCount: number;
+  firstAt: number;
+  lastAt: number;
+}
+
 export interface LearningRepository {
   findState(userId: string, wordId: string): Promise<UserWordStateRecord | null>;
   /** 原子写入一次复习：幂等判定 + 状态推进 + 流水 + 错拼记录在同一事务内 */
@@ -86,4 +97,8 @@ export interface LearningRepository {
   countReviewsSince(userId: string, since: number): Promise<number>;
   /** 到期词条（按逾期时长倒序），供出题使用 */
   listDueWordIds(userId: string, now: number, limit: number): Promise<string[]>;
+  /** 错拼清单：按词条聚合错拼次数与分类（仅当前用户自己的数据） */
+  listSpellingErrorGroups(userId: string, limit: number): Promise<SpellingErrorGroupRecord[]>;
+  /** 错拼过的词条总数（用于清单分页展示） */
+  countSpellingErrorGroups(userId: string): Promise<number>;
 }

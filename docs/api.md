@@ -272,9 +272,41 @@
 - **幂等**：同一 `eventId` 重复提交不会二次推进学习状态，也不重复写流水（以 `review_logs.event_id` 唯一约束兜底）；重试返回与首次一致的结果。
 - **留痕**：每次提交写入 `review_logs`，包含评分后的 `easeFactor`/`intervalDays`/`repetitions`/`dueAt`，供未来迁移 FSRS。
 - **错拼记录**：拼写/听写答错时按形态分类（`missing_letter`/`duplicate_letter`/`order_error`/`wrong_letter`）写入 `spelling_errors`，用于提高该词后续出现权重。
+- **错拼追加惩罚**：在「答错」本身的难度惩罚（−0.20）之外，按错拼类型再降难度（`order_error` −0.10、`missing_letter`/`duplicate_letter` −0.05、`wrong_letter` −0.03，同一次答题可累加），下限仍为 1.3；错拼后的词在 7 天内于复习中优先出现。
 - **不可信输入**：请求体中的 `rating`/`easeFactor`/`intervalDays` 等字段会被 DTO 白名单直接拒绝（400）。
 
 错误：`404 WORD_NOT_FOUND`、`400 VALIDATION_FAILED`、未登录 `401`。
+
+### GET /review/spelling-errors
+
+错拼清单：按词条聚合当前用户的错拼次数与分类，按最近错拼时间倒序。**数据范围严格限定为当前登录用户**（查询条件带 `user_id`，越权不可见）。
+
+请求参数：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `limit` | int? | 返回的词条数，默认 30，范围 1–100 |
+
+响应（200）：
+
+```json
+{ "data": {
+  "items": [
+    { "wordId": "uuid", "headword": "abruptly", "lastActual": "aburptly",
+      "errorCounts": { "missing_letter": 1, "duplicate_letter": 0, "order_error": 1, "wrong_letter": 0 },
+      "totalCount": 2, "firstAt": 1790000000000, "lastAt": 1790003600000 }
+  ],
+  "total": 1
+} }
+```
+
+说明：
+
+- `total` 是**错拼过的词条总数**（不受 `limit` 影响），`items` 是按 `limit` 截断后的明细。
+- `lastActual` 是最近一次的错误输入，供用户回看自己错在哪。
+- 全部使用绑定参数查询；`word_id` 列表由服务端生成，不接受客户端输入。
+
+错误：`400 VALIDATION_FAILED`（`limit` 越界）、未登录 `401`。
 
 ### POST /study/next
 

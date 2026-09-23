@@ -5,8 +5,8 @@
 > **禁止在本文件中写入任何密码、Token、API Key、恢复码、主密钥或其他秘密信息。**
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
-- 快照时间：2026-09-22
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6（词库导入，CET-4/6 已入本地库）、Task 7（复习落库与幂等）、Task 8（出题与选词）。
+- 快照时间：2026-09-23
+- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1（SM-2）、Task 2（题型/DTO 契约）、Task 3（schema 与迁移）、Task 4（StorageProvider 与上传安全）、Task 5（词库仓储与只读接口）、Task 6（词库导入，CET-4/6 已入本地库）、Task 7（复习落库与幂等）、Task 8（出题与选词）、Task 9（拼写与听写：错拼惩罚接入 + 错拼清单）。剩余 Task 10–16。
 
 ### 词库数据现状（Task 6 完成）
 - **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
@@ -132,6 +132,7 @@ leximochi/
 | GET | `/words/:id` | 需登录 | 词条详情（词典数据 + 独立 AI 补充 + 我的学习状态） |
 | POST | `/review/submit` | 需登录 | 提交答题：服务端判定对错、映射评分、SM-2 调度并落库；`eventId` 幂等 |
 | POST | `/study/next` | 需登录 | 取下一题（新词/复习/拼写/听写）：选词策略 + 出题，题目不含答案 |
+| GET | `/review/spelling-errors` | 需登录 | 错拼清单：按词聚合错拼次数/分类（仅本人数据，`limit` ≤ 100） |
 | POST | `/auth/captcha` | 公开 | 签发算术挑战（HMAC 签名、TTL 120s、一次性、绑定 IP） |
 | POST | `/auth/register` | 公开 | 注册，返回用户与一次性 10 个恢复码 |
 | POST | `/auth/login` | 公开 | Web 走 Cookie / 移动端（`x-client-type: mobile`）走 Body |
@@ -162,29 +163,13 @@ leximochi/
 
 ## 8. 已完成 / 进行中 / 未完成
 
-### 已完成（对应计划 Task 1–11）
-- Monorepo 地基：npm workspaces、TS 6 基座、ESLint/Prettier、`.gitignore`/`.gitattributes`/`.env.example`、workspaces 校验脚本、README。
-- `@leximochi/types`（错误码/权限/限额/DTO 契约）、`@leximochi/core`（用户名/密码/恢复码规则）、`@leximochi/shared`（设计 Token）。
-- 服务端骨架：启动期配置校验（缺失/过短/占位秘密 → 拒绝启动）、统一错误响应（不泄露堆栈/路径）、helmet、CORS 白名单、CSRF Origin 校验、请求 ID、`/health`。
-- 数据库层：10 张表 schema、首版迁移、WAL/busy_timeout/外键断言、仓储接口 + Drizzle 实现、事务辅助、审计服务。
-- 注册：验证码抽象与实现、Argon2id、恢复码哈希入库、失败补偿、审计。
-- 登录与 Token：JWT access token、refresh 轮换与复用检测、登出/退出全部设备/设备会话管理、全局认证守卫（权限每请求读库）。
-- 恢复码：`/auth/recovery` 一次性重置密码（先校验密码强度再消费恢复码、成功后撤销全部会话并整组重发、条件更新防重放）。
-- 限流与锁定：登录按用户名与 IP 双维度计数、注册/恢复码/验证码分别限流、达阈值 429 + 审计。
-- RBAC 与后台：`PermissionsGuard` + `/admin/users`（检索/分页/封禁/解封）+ `/admin/audit-logs` + `create-admin` 脚本。
-- API SDK：`@leximochi/api-client`（ApiError 解包、鉴权头、401 回调）与 `@leximochi/auth`（会话状态机）。
+### Phase 2 进度（计划 `docs/plans/2026-09-22-phase-2-vocabulary.md`）
+- ✅ Task 1–9：SM-2 核心（`packages/core/src/sm2.ts`）、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单。
+- ⬜ Task 10 生词本 → Task 11 学习历史与统计 → Task 12 管理后台词库接口 → Task 13 Web 单词模块 → Task 14 Admin 词库管理 → Task 15 Android 单词模块 → Task 16 Phase 2 验收。
 
-### 进行中
-- 计划 Task 12 起：三端骨架与验收。
-
-### 未完成（Phase 1 剩余）
-1. `apps/web`（注册/登录/受保护首页/设备会话管理）。
-2. `apps/admin`（管理员登录、用户列表、封禁二次确认、审计日志）。
-3. `apps/mobile`（RN 0.87.1 登录界面、Metro monorepo 配置、Gradle 代理、APK 构建验证）。
-4. Phase 1 验收报告（`docs/phase-1-acceptance.md`）、`docs/api.md`、发布前安全自检。
-
-### Phase 2–7
-全部未开始（词库与复习、宠物闭环、听力、AI 口语、勋章、离线同步与发布）。
+### Phase 1（已完成，历史）
+- Monorepo 地基、`@leximochi/types|core|shared|api-client|auth`、服务端骨架与数据库层、账号/登录/恢复码/RBAC、`apps/web`、`apps/admin`、`apps/mobile`（APK 构建通过）、`docs/phase-1-acceptance.md`。
+- 已完成（Task 12–15）：`apps/web`（注册/登录/受保护首页/设备会话）、`apps/admin`（管理员登录、用户检索、封禁二次确认、审计日志）、`apps/mobile`（RN 0.87.1 + Metro monorepo + APK）、Phase 1 验收与文档。
 
 ---
 
@@ -196,14 +181,14 @@ leximochi/
 | `npm install` | 成功（root + 全部 workspace） |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | exit 0：服务端 77、core 15、api-client 7、auth 5、types 3（合计 **107 个用例**） |
+| `npm test` | exit 0：服务端 176、core 33、types 10、api-client 7、auth 7、admin 6、web 4、mobile 2（合计 **245 个用例**） |
 | `npm run build` | exit 0 |
 
 ### 服务端专项
 | 命令 | 结果 |
 | --- | --- |
 | `npm run build -w @leximochi/server` | exit 0，产出 `dist/main.js`（CJS） |
-| `npm test -w @leximochi/server` | 21 suites / 170 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 10、答案判定 12、复习落库与幂等 12、来源转换 9、出题与选词 9） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
+| `npm test -w @leximochi/server` | 23 suites / 176 tests 全通过（Phase 2 追加：storage 20、词库只读接口 11、导入工具 10、答案判定 12、复习落库与幂等 12、来源转换 9、出题与选词 9、拼写与听写 6） |（Phase 2 新增 schema 用例 8：13 张新表、`review_logs.event_id` 唯一、`words.headword_canonical` 唯一、`user_word_states` 复合主键、词库级联删除、`word_ai_notes` 唯一、错拼记录级联） |（验证码 6、注册 7、登录 12、会话 4、Token 5、数据库 5、配置 6、健康 2、恢复码 8、限流 5、锁定 4、后台权限 5、后台管理 8） |
 | `create-admin` 脚本实测 | 首次创建成功（仅输出用户名）；重复执行未加 `--allow-existing` 退出码 1；缺 `ADMIN_PASSWORD` 打印用法退出码 1；库内确认 admin 角色与 `admin.bootstrap.created` 审计 |
 | `npx drizzle-kit generate`（apps/server） | 生成 `drizzle/0000_real_steve_rogers.sql`（10 表 / 9 外键 / 全部索引） |
 | 启动实测（本地随机密钥 `.env`） | `/health` → 200；未知路由 → 404 统一格式；CSP/nosniff/X-Frame-Options/x-request-id 均存在；自动创建 `data/db/leximochi.sqlite` + `-wal`/`-shm`；只读连接确认 `journal_mode=wal` |
@@ -298,14 +283,17 @@ leximochi/
 
 ---
 
-## 16. 下一步任务优先级
+## 16. 下一步任务优先级（Phase 2 剩余）
 
-1. **计划 Task 12**：`apps/web`（Vite + React 19.2.3；注册/登录/受保护首页/设备会话管理；使用 `design-tokens` 与 frontend-design 规范，不建空占位页）。
-2. **计划 Task 13**：`apps/admin`（独立后台：管理员登录、用户检索、封禁二次确认、审计日志；端口 5174）。
-3. ~~计划 Task 14~~ ✅：`apps/mobile` 完成 RN 0.87.1 初始化、workspace 改造、Metro monorepo 配置、Gradle 项目内代理与两处 monorepo 路径适配；`assembleDebug` 成功产出 APK。
-4. **计划 Task 15**：全量验收、安全自检、`docs/phase-1-acceptance.md`、`docs/api.md`、本文件最终更新。
+1. **Task 10**：生词本 `/notebook`（增删查 + 幂等 + 越权返回 404）。
+2. **Task 11**：学习历史与统计 `/review/history`、`/review/stats`（今日量、正确率、平均用时、已掌握、近 7 日趋势）。
+3. **Task 12**：管理后台词库接口（RBAC 新权限 `admin.wordbooks.*`/`admin.words.*`、词库与词条 CRUD、批量导入、音频上传，全部写审计）。
+4. **Task 13**：Web 单词模块（新词卡片、多题型复习、拼写/听写、生词本、统计页），须浏览器实测。
+5. **Task 14**：Admin 端词库管理界面。
+6. **Task 15**：Android 单词模块（离线词库下载与本地读取、学习/复习、拼写/听写）。
+7. **Task 16**：Phase 2 验收（全量 test/lint/typecheck/build + 浏览器与 Android 实测 + 安全自检 + `docs/phase-2-acceptance.md`）。
 
-执行每一步时请对照 `docs/plans/2026-09-21-phase-1-foundation.md` 的任务步骤与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。
+执行每一步时对照 `docs/plans/2026-09-22-phase-2-vocabulary.md` 的任务与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。
 
 ---
 

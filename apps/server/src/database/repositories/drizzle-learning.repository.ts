@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, isNotNull, lte, sql } from 'drizzle-orm';
-import type { QuestionType, ReviewRating, WordStatus } from '@leximochi/types';
+import { isSpellingErrorType, type QuestionType, type ReviewRating, type SpellingErrorType, type WordStatus } from '@leximochi/types';
 import { DATABASE } from '../../database/database.constants';
 import type { DatabaseService } from '../../database/database.service';
 import { reviewLogs, spellingErrors, userWordStates } from '../../database/schema';
@@ -10,6 +10,7 @@ import type {
   ApplyReviewResult,
   LearningRepository,
   ReviewLogRecord,
+  SpellingErrorGroupRecord,
   UserWordStateRecord,
 } from '../../modules/learning/domain/learning.repository';
 
@@ -227,6 +228,83 @@ export class DrizzleLearningRepository implements LearningRepository {
       .all()
       .map((row) => row.wordId);
   }
+
+  async listSpellingErrorGroups(userId: string, limit: number): Promise<SpellingErrorGroupRecord[]> {
+    // 全部使用绑定参数；word_id 列表由服务端生成，不接受客户端输入
+    const groups = this.database.sqlite
+      .prepare(
+        `SELECT se.word_id AS wordId,
+                w.headword AS headword,
+                COUNT(*) AS totalCount,
+                MIN(se.created_at) AS firstAt,
+                MAX(se.created_at) AS lastAt,
+                (SELECT s2.actual FROM spelling_errors s2
+                  WHERE s2.user_id = se.user_id AND s2.word_id = se.word_id
+                  ORDER BY s2.rowid DESC LIMIT 1) AS lastActual
+         FROM spelling_errors se
+         JOIN words w ON w.id = se.word_id
+         WHERE se.user_id = ?
+         GROUP BY se.word_id
+         ORDER BY lastAt DESC, se.word_id ASC
+         LIMIT ?`,
+      )
+      .all(userId, limit) as Array<{
+      wordId: string;
+      headword: string;
+      totalCount: number;
+      firstAt: number;
+      lastAt: number;
+      lastActual: string | null;
+    }>;
+
+    if (groups.length === 0) return [];
+
+    const placeholders = groups.map(() => '?').join(',');
+    const typeRows = this.database.sqlite
+      .prepare(
+        `SELECT word_id AS wordId, error_types AS errorTypes, COUNT(*) AS count
+         FROM spelling_errors
+         WHERE user_id = ? AND word_id IN (${placeholders})
+         GROUP BY word_id, error_types`,
+      )
+      .all(userId, ...groups.map((group) => group.wordId)) as Array<{
+      wordId: string;
+      errorTypes: string;
+      count: number;
+    }>;
+
+    const countsByWord = new Map<string, Record<SpellingErrorType, number>>();
+    for (const row of typeRows) {
+      const counts = countsByWord.get(row.wordId) ?? emptyErrorCounts();
+      for (const raw of row.errorTypes.split(',')) {
+        const type = raw.trim();
+        // 库中历史数据可能含未知分类：忽略而不是崩溃
+        if (isSpellingErrorType(type)) counts[type] += row.count;
+      }
+      countsByWord.set(row.wordId, counts);
+    }
+
+    return groups.map((group) => ({
+      wordId: group.wordId,
+      headword: group.headword,
+      lastActual: group.lastActual ?? '',
+      errorCounts: countsByWord.get(group.wordId) ?? emptyErrorCounts(),
+      totalCount: Number(group.totalCount),
+      firstAt: Number(group.firstAt),
+      lastAt: Number(group.lastAt),
+    }));
+  }
+
+  async countSpellingErrorGroups(userId: string): Promise<number> {
+    const row = this.database.sqlite
+      .prepare('SELECT COUNT(DISTINCT word_id) AS count FROM spelling_errors WHERE user_id = ?')
+      .get(userId) as { count: number } | undefined;
+    return Number(row?.count ?? 0);
+  }
+}
+
+function emptyErrorCounts(): Record<SpellingErrorType, number> {
+  return { missing_letter: 0, duplicate_letter: 0, order_error: 0, wrong_letter: 0 };
 }
 
 function toStateRecord(row: typeof userWordStates.$inferSelect): UserWordStateRecord {
