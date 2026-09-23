@@ -164,12 +164,50 @@ export class DrizzleLearningRepository implements LearningRepository {
     return Number(row?.count ?? 0);
   }
 
-  async countReviewsSince(userId: string, since: number): Promise<number> {
+  async listLearnedWordIds(userId: string, limit: number): Promise<string[]> {
+    return this.database.db
+      .select({ wordId: userWordStates.wordId })
+      .from(userWordStates)
+      .where(eq(userWordStates.userId, userId))
+      .orderBy(asc(userWordStates.firstLearnedAt))
+      .limit(limit)
+      .all()
+      .map((row) => row.wordId);
+  }
+
+  async listRecentlyMisspelledWordIds(userId: string, since: number, limit: number): Promise<string[]> {
+    const rows = this.database.sqlite
+      .prepare(
+        `SELECT word_id, MAX(created_at) AS last_at
+         FROM spelling_errors
+         WHERE user_id = ? AND created_at >= ?
+         GROUP BY word_id
+         ORDER BY last_at DESC
+         LIMIT ?`,
+      )
+      .all(userId, since, limit) as Array<{ word_id: string }>;
+    return rows.map((row) => row.word_id);
+  }
+
+  async countNewLearnedSince(userId: string, since: number): Promise<number> {
     const row = this.database.db
       .select({ count: sql<number>`COUNT(*)` })
-      .from(reviewLogs)
-      .where(and(eq(reviewLogs.userId, userId), sql`${reviewLogs.answeredAt} >= ${since}`))
+      .from(userWordStates)
+      .where(and(eq(userWordStates.userId, userId), sql`${userWordStates.firstLearnedAt} >= ${since}`))
       .get();
+    return Number(row?.count ?? 0);
+  }
+
+  async countReviewsSince(userId: string, since: number): Promise<number> {
+    // 只统计「今天之前就已学过」的词的复习次数，避免与新学计数重复
+    const row = this.database.sqlite
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM review_logs rl
+         JOIN user_word_states s ON s.user_id = rl.user_id AND s.word_id = rl.word_id
+         WHERE rl.user_id = ? AND rl.answered_at >= ? AND s.first_learned_at < ?`,
+      )
+      .get(userId, since, since) as { count: number };
     return Number(row?.count ?? 0);
   }
 

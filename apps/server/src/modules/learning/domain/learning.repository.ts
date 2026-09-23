@@ -76,6 +76,13 @@ export interface LearningRepository {
   applyReview(input: ApplyReviewInput): Promise<ApplyReviewResult>;
   findReviewLogByEventId(userId: string, eventId: string): Promise<ReviewLogRecord | null>;
   countDue(userId: string, now: number): Promise<number>;
+  /** 已学过的词条（按首次学习时间升序），供拼写/听写训练选词 */
+  listLearnedWordIds(userId: string, limit: number): Promise<string[]>;
+  /** 近期错拼过的词条（用于复习加权优先出现） */
+  listRecentlyMisspelledWordIds(userId: string, since: number, limit: number): Promise<string[]>;
+  /** 今日新学词数（首次学习时间在今天之内） */
+  countNewLearnedSince(userId: string, since: number): Promise<number>;
+  /** 今日复习次数：只统计「今天之前就已学过」的词的复习，避免与新学重复计数 */
   countReviewsSince(userId: string, since: number): Promise<number>;
   /** 到期词条（按逾期时长倒序），供出题使用 */
   listDueWordIds(userId: string, now: number, limit: number): Promise<string[]>;

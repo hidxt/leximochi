@@ -161,6 +161,57 @@ export class DrizzleWordRepository implements WordRepository {
     };
   }
 
+  async listNewWordIdsForWordbook(
+    userId: string,
+    wordbookId: string,
+    limit: number,
+  ): Promise<string[]> {
+    const rows = this.database.sqlite
+      .prepare(
+        `SELECT e.word_id AS word_id
+         FROM wordbook_entries e
+         LEFT JOIN user_word_states s ON s.word_id = e.word_id AND s.user_id = ?
+         WHERE e.wordbook_id = ? AND s.user_id IS NULL
+         ORDER BY (e.rank IS NULL), e.rank ASC, e.word_id ASC
+         LIMIT ?`,
+      )
+      .all(userId, wordbookId, limit) as Array<{ word_id: string }>;
+    return rows.map((row) => row.word_id);
+  }
+
+  async countNewWordsForWordbook(userId: string, wordbookId: string): Promise<number> {
+    const row = this.database.sqlite
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM wordbook_entries e
+         LEFT JOIN user_word_states s ON s.word_id = e.word_id AND s.user_id = ?
+         WHERE e.wordbook_id = ? AND s.user_id IS NULL`,
+      )
+      .get(userId, wordbookId) as { count: number };
+    return Number(row?.count ?? 0);
+  }
+
+  async listDistractorDefinitions(options: {
+    wordbookId?: string;
+    excludeWordId: string;
+    limit: number;
+  }): Promise<string[]> {
+    let sqlText = `SELECT DISTINCT s.definition_zh AS definition
+       FROM word_senses s`;
+    // 参数按 SQL 中 ? 的出现顺序传入：wordbookId（可选）→ excludeWordId → limit
+    const params: unknown[] = [];
+    if (options.wordbookId) {
+      sqlText += ` JOIN wordbook_entries e ON e.word_id = s.word_id AND e.wordbook_id = ?`;
+      params.push(options.wordbookId);
+    }
+    sqlText += ` WHERE s.word_id != ? ORDER BY RANDOM() LIMIT ?`;
+    params.push(options.excludeWordId, options.limit);
+    const rows = this.database.sqlite.prepare(sqlText).all(...(params as never[])) as Array<{
+      definition: string;
+    }>;
+    return rows.map((row) => row.definition);
+  }
+
   /** 一次取回一批词条的全部嵌套数据，避免逐词查询造成 N+1 */
   private async nestedFor(wordIds: string[]): Promise<{
     senses: Map<string, WordSenseDto[]>;

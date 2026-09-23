@@ -251,6 +251,13 @@ export interface StudyProgressDto {
 export interface StudyNextResponse {
   question: StudyQuestionDto | null;
   progress: StudyProgressDto;
+  /** 无法出题时的明确原因（如「当前词库没有音频资源，听写暂不可用」），禁止静默返回空 */
+  notice: string | null;
+}
+
+export interface StudyNextRequest {
+  mode: StudyMode;
+  wordbookKey?: string;
 }
 
 export interface SubmitReviewRequest {

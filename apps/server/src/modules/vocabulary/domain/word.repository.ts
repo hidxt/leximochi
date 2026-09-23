@@ -68,4 +68,12 @@ export interface WordRepository {
     options: { wordbookId?: string; limit: number },
   ): Promise<WordSearchItem[]>;
   findUserState(userId: string, wordId: string): Promise<WordStateRecord | null>;
+  /** 该词库中用户尚未学过的词条（按词库内 rank 升序），用于新词学习 */
+  listNewWordIdsForWordbook(userId: string, wordbookId: string, limit: number): Promise<string[]>;
+  /** 该词库中尚未学过的词条数量（用于展示「还剩多少新词」） */
+  countNewWordsForWordbook(userId: string, wordbookId: string): Promise<number>;
+  /** 抽取干扰项释义（来自其他词条，按来源可限定词库），用于选择题选项 */
+  listDistractorDefinitions(
+    options: { wordbookId?: string; excludeWordId: string; limit: number },
+  ): Promise<string[]>;
 }

@@ -275,3 +275,46 @@
 - **不可信输入**：请求体中的 `rating`/`easeFactor`/`intervalDays` 等字段会被 DTO 白名单直接拒绝（400）。
 
 错误：`404 WORD_NOT_FOUND`、`400 VALIDATION_FAILED`、未登录 `401`。
+
+### POST /study/next
+
+取下一题。返回的题目**不含正确答案**（判定一律在 `/review/submit` 由服务端完成）。
+
+请求：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `mode` | enum | `new`（新词）/ `review`（到期复习）/ `spelling`（拼写训练）/ `dictation`（听写训练） |
+| `wordbookKey` | string? | 可选；缺省时用默认词库（系统词库优先） |
+
+响应（200）：
+
+```json
+{ "data": {
+  "question": {
+    "questionId": "uuid",
+    "wordId": "uuid",
+    "questionType": "definition_choice",
+    "mode": "new",
+    "prompt": "abandon",
+    "phonetic": "/əˈbændən/",
+    "audioKey": null,
+    "options": ["放纵", "放弃；抛弃", "能力；才能", "吸收"],
+    "requiresInput": false
+  },
+  "progress": { "newRemaining": 4543, "dueRemaining": 12, "learnedToday": 1,
+                "reviewedToday": 0, "dailyNewTarget": 20 },
+  "notice": null
+} }
+```
+
+选词与出题规则：
+
+- `new`：指定/默认词库中**尚未学过**的词，按词库内 `rank` 升序；达到每日新词目标（默认 20）后返回 `question: null` 并在 `notice` 中说明。
+- `review`：已到期（`dueAt <= now`）的词，**近 7 天内错拼过的词优先**，其余按逾期时长排序。
+- `spelling`：从已学过的词中出拼写题（题干给中文释义 + 音标提示）。
+- `dictation`：从已学过**且有音频**的词中出题；当前词库无音频时返回 `question: null` 且 `notice` 明确说明，**不静默失败**。
+- 五种题型：`definition_choice`（看词选释义，4 选项）、`en_to_zh`（看词输入中文）、`zh_to_en`（看中文输入英文）、`spelling`（拼写，含音标）、`listening_dictation`（听音写词，需音频）。
+- 选择题干扰项来自**其他词条**的释义并去重；输入型题目的题干与选项**绝不包含答案词形**。
+- 复习题题型按词条 ID 稳定轮换，保证同一词多次练习时题型可预期。
+- `progress.newRemaining` 表示该词库**还剩多少没学过的词**；每日目标进度由 `learnedToday` / `dailyNewTarget` 表达。
