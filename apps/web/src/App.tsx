@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import type { MeResponse, PublicUser } from '@leximochi/types';
+import { AppNav } from './components/AppNav';
 import { MochiPet } from './components/MochiPet';
 import { RequireAuth } from './components/RequireAuth';
 import { api, session } from './lib/api';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { MePage } from './pages/MePage';
+import { NotebookPage } from './pages/NotebookPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { StatsPage } from './pages/StatsPage';
+import { StudyPage } from './pages/StudyPage';
+import { WordsPage } from './pages/WordsPage';
 
 type SessionState = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -54,6 +60,7 @@ export function App(): ReactElement {
   }, [navigate]);
 
   const authenticated = state === 'authenticated';
+  const ready = state === 'authenticated' && me !== null;
 
   return (
     <main className="desk">
@@ -76,48 +83,88 @@ export function App(): ReactElement {
             <p className="mono">正在恢复登录状态…</p>
           </section>
         ) : (
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <RequireAuth authenticated={authenticated}>
-                  {me ? (
-                    <HomePage
-                      api={api}
-                      session={session}
-                      me={me}
-                      onLoggedOut={handleLoggedOut}
-                    />
-                  ) : (
-                    <section className="card">
-                      <p className="mono">正在读取账号信息…</p>
-                    </section>
-                  )}
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/login"
-              element={
-                authenticated ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <LoginPage api={api} session={session} onAuthenticated={(user) => void handleAuthenticated(user)} />
-                )
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                authenticated ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <RegisterPage api={api} onRegistered={() => navigate('/login', { replace: true })} />
-                )
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <>
+            {authenticated ? <AppNav /> : null}
+            {authenticated && me === null ? (
+              <section className="card">
+                <p className="mono">正在读取账号信息…</p>
+              </section>
+            ) : (
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      {me ? <HomePage api={api} me={me} /> : null}
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/words"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      <WordsPage api={api} />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/words/study"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      <StudyPage api={api} />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/notebook"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      <NotebookPage api={api} />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/stats"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      <StatsPage api={api} />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/me"
+                  element={
+                    <RequireAuth authenticated={ready}>
+                      {me ? (
+                        <MePage api={api} session={session} me={me} onLoggedOut={handleLoggedOut} />
+                      ) : null}
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/login"
+                  element={
+                    authenticated ? (
+                      <Navigate to="/" replace />
+                    ) : (
+                      <LoginPage api={api} session={session} onAuthenticated={(user) => void handleAuthenticated(user)} />
+                    )
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    authenticated ? (
+                      <Navigate to="/" replace />
+                    ) : (
+                      <RegisterPage api={api} onRegistered={() => navigate('/login', { replace: true })} />
+                    )
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            )}
+          </>
         )}
 
         {authenticated ? null : (

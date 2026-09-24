@@ -1,151 +1,133 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { Link } from 'react-router-dom';
 import type { ApiClient } from '@leximochi/api-client';
-import type { SessionManager } from '@leximochi/auth';
-import type { MeResponse, SessionSummary } from '@leximochi/types';
+import type { MeResponse, ReviewStats, StudyMode, WordbookSummary } from '@leximochi/types';
 import { Notice } from '../components/Notice';
 
 interface HomePageProps {
   api: ApiClient;
-  session: SessionManager;
   me: MeResponse;
-  onLoggedOut: () => void;
 }
 
-export function HomePage({ api, session, me, onLoggedOut }: HomePageProps): ReactElement {
-  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+const TASKS: Array<{ mode: StudyMode; title: string; hint: string }> = [
+  { mode: 'new', title: '学新词', hint: '按词库顺序推进' },
+  { mode: 'review', title: '到期复习', hint: '先消化到期的词' },
+  { mode: 'spelling', title: '拼写', hint: '动手写一遍' },
+  { mode: 'dictation', title: '听写', hint: '听音写词' },
+];
 
-  const loadSessions = useCallback(async () => {
+/** 首页：今日学习任务 + 快捷开始（宠物状态在左侧常驻显示） */
+export function HomePage({ api, me }: HomePageProps): ReactElement {
+  const [stats, setStats] = useState<ReviewStats | null>(null);
+  const [books, setBooks] = useState<WordbookSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
     try {
-      setSessions(await api.auth.listSessions());
+      const [current, wordbooks] = await Promise.all([
+        api.review.stats(),
+        api.vocabulary.listWordbooks(),
+      ]);
+      setStats(current);
+      setBooks(wordbooks);
     } catch (caught) {
       setError(messageOf(caught));
     }
   }, [api]);
 
   useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
+    void load();
+  }, [load]);
 
-  async function handleDelete(sessionId: string): Promise<void> {
-    setError(null);
-    setBusy(true);
-    try {
-      await api.auth.deleteSession(sessionId);
-      await loadSessions();
-    } catch (caught) {
-      setError(messageOf(caught));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleLogout(): Promise<void> {
-    setBusy(true);
-    await session.logout();
-    onLoggedOut();
-  }
-
-  async function handleLogoutAll(): Promise<void> {
-    setError(null);
-    setBusy(true);
-    try {
-      await api.auth.logoutAll();
-    } catch (caught) {
-      setError(messageOf(caught));
-    } finally {
-      await session.logout();
-      onLoggedOut();
-    }
-  }
-
-  const others = (sessions ?? []).filter((item) => !item.isCurrent);
+  const primaryBook = books[0]?.key;
+  const bookQuery = primaryBook ? `&book=${encodeURIComponent(primaryBook)}` : '';
 
   return (
     <>
       <section className="card">
-        <span className="seal">已登录</span>
-        <h1 className="title">{me.user.username}</h1>
-        <p className="subtitle">账号建于 {formatDate(me.user.createdAt)}</p>
+        <span className="seal">今日</span>
+        <h1 className="title">
+          {greeting()}，{me.user.username}
+        </h1>
+        <p className="subtitle">
+          {stats === null
+            ? '正在读取今天的学习进度…'
+            : stats.learnedToday === 0 && stats.reviewedToday === 0
+              ? '今天还没有开始，先学几个新词吧。'
+              : `今天已学 ${stats.learnedToday} 个新词、复习 ${stats.reviewedToday} 次。`}
+        </p>
 
         {error ? <Notice tone="error">{error}</Notice> : null}
 
-        <dl className="meta">
-          <dt>身份</dt>
-          <dd>{me.user.roles.includes('admin') ? '管理员' : '学习者'}</dd>
-          <dt>账号状态</dt>
-          <dd>{me.user.status === 'active' ? '正常' : '已封禁'}</dd>
-          <dt>学习数据</dt>
-          <dd>单词、口语、听力与宠物将在后续阶段接入，此处不展示占位数据。</dd>
-        </dl>
+        {stats ? (
+          <div className="tally">
+            <div className="tally__cell">
+              <div className="tally__value">{stats.learnedToday}</div>
+              <div className="tally__label">今日新学</div>
+            </div>
+            <div className="tally__cell">
+              <div className="tally__value">{stats.reviewedToday}</div>
+              <div className="tally__label">今日复习</div>
+            </div>
+            <div className="tally__cell">
+              <div className="tally__value">
+                {stats.accuracyToday === null ? '—' : `${Math.round(stats.accuracyToday * 100)}%`}
+              </div>
+              <div className="tally__label">今日正确率</div>
+            </div>
+            <div className="tally__cell">
+              <div className="tally__value">{stats.learningWords}</div>
+              <div className="tally__label">学习中</div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="button-row">
-          <button className="button button--quiet" type="button" disabled={busy} onClick={() => void handleLogout()}>
-            退出登录
-          </button>
-          <button
-            className="button button--danger"
-            type="button"
-            disabled={busy}
-            onClick={() => void handleLogoutAll()}
-          >
-            退出全部设备
-          </button>
+          <Link className="button button--primary" to={`/words/study?mode=new${bookQuery}`}>
+            开始学新词
+          </Link>
+          <Link className="button button--quiet" to={`/words/study?mode=review${bookQuery}`}>
+            开始复习
+          </Link>
         </div>
       </section>
 
       <section className="card">
-        <p className="section-label">登录设备</p>
-        <h2 className="title" style={{ fontSize: 22 }}>
-          共 {sessions?.length ?? '…'} 个会话
-        </h2>
-        <p className="subtitle">
-          发现不认识的设备时，删除该会话即可让它立即失效。删除后对方需重新登录。
-        </p>
-
-        {sessions === null ? (
-          <p className="mono">正在读取…</p>
-        ) : sessions.length === 0 ? (
-          <p className="mono">当前没有活跃会话。</p>
-        ) : (
-          <>
-            {sessions.map((item) => (
-              <div className="session" key={item.id}>
-                <div>
-                  <div>
-                    {item.isCurrent ? '本机（当前会话）' : '其他设备'}
-                    {item.isCurrent ? <span className="seal" style={{ marginLeft: 8 }}>当前</span> : null}
-                  </div>
-                  <div className="session__meta">
-                    {item.userAgent ?? '未知客户端'} · 最近活动 {formatDate(item.lastUsedAt ?? item.createdAt)}
-                    {item.ip ? ` · ${item.ip}` : ''}
-                  </div>
-                </div>
-                {item.isCurrent ? null : (
-                  <button
-                    className="button button--danger"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void handleDelete(item.id)}
-                  >
-                    删除会话
-                  </button>
-                )}
+        <p className="section-label">今日任务</p>
+        <div className="tally">
+          {TASKS.map((task) => (
+            <Link
+              key={task.mode}
+              className="card"
+              style={{ display: 'block', textDecoration: 'none' }}
+              to={`/words/study?mode=${task.mode}${bookQuery}`}
+            >
+              <div className="tally__value" style={{ fontSize: 18 }}>
+                {task.title}
               </div>
-            ))}
-            {others.length === 0 ? (
-              <p className="field__hint">目前只有这一台设备登录。</p>
-            ) : null}
-          </>
-        )}
+              <div className="tally__label">{task.hint}</div>
+            </Link>
+          ))}
+        </div>
+        <div className="button-row">
+          <Link className="button button--quiet" to="/words">
+            全部单词功能
+          </Link>
+          <Link className="button button--quiet" to="/stats">
+            学习统计
+          </Link>
+        </div>
       </section>
     </>
   );
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 6) return '夜深了';
+  if (hour < 12) return '早上好';
+  if (hour < 18) return '下午好';
+  return '晚上好';
 }
 
 function messageOf(caught: unknown): string {

@@ -443,3 +443,336 @@ a {
   color: var(--ink);
   font-weight: 600;
 }
+
+/* ================= Phase 2：单词模块 ================= */
+
+/* ---------- 一级导航 ---------- */
+.nav {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.nav__item {
+  font-size: 15px;
+  text-decoration: none;
+  color: var(--ink-soft);
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+}
+
+.nav__item:hover {
+  color: var(--ink);
+}
+
+.nav__item--active {
+  color: var(--ink);
+  border-bottom-color: var(--cinnabar);
+  font-weight: 600;
+}
+
+.nav__item--planned {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* ---------- 今日概况 ---------- */
+.tally {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-md);
+  margin: var(--space-md) 0 0;
+}
+
+.tally__cell {
+  border-left: 2px solid var(--border);
+  padding-left: var(--space-sm);
+}
+
+.tally__value {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.tally__label {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* ---------- 田字格：习字练习格（本模块的签名元素） ---------- */
+.tian {
+  --tian: 224px;
+  position: relative;
+  width: var(--tian);
+  height: var(--tian);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  background-color: #fff;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(200, 56, 43, 0.34) 0 5px, transparent 5px 11px),
+    repeating-linear-gradient(0deg, rgba(200, 56, 43, 0.34) 0 5px, transparent 5px 11px);
+  background-size: 100% 1px, 1px 100%;
+  background-position: center center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  text-align: center;
+  overflow: hidden;
+}
+
+.tian__text {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.tian--answer .tian__text {
+  color: var(--ink);
+}
+
+.tian--missing .tian__text {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/* 印章：判定落章（签名元素） */
+.stamp {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  border: 3px double currentColor;
+  border-radius: 6px;
+  transform: rotate(-8deg);
+  background: rgba(255, 252, 246, 0.86);
+  animation: stamp-land 260ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.stamp--right {
+  color: var(--matcha);
+}
+
+.stamp--wrong {
+  color: var(--cinnabar);
+}
+
+@keyframes stamp-land {
+  from {
+    opacity: 0;
+    transform: rotate(-18deg) scale(1.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-8deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+  }
+}
+
+/* ---------- 练习流 ---------- */
+.practice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.practice__prompt {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.practice__phonetic {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.options {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.option {
+  text-align: left;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.option:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.option--picked {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+
+.option--correct {
+  border-color: var(--matcha);
+  box-shadow: inset 3px 0 0 var(--matcha);
+}
+
+.option--wrong {
+  border-color: var(--cinnabar);
+  box-shadow: inset 3px 0 0 var(--cinnabar);
+}
+
+.answer-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.answer-row .field {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+}
+
+.answer-input {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+}
+
+/* 进度：每格代表一个待办（真实序列：词库 rank / 到期队列） */
+.marks {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mark {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background-image:
+    linear-gradient(to right, transparent calc(50% - 0.5px), rgba(25, 21, 16, 0.25) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(25, 21, 16, 0.25) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+.mark--done {
+  background-color: rgba(200, 56, 43, 0.75);
+  border-color: var(--cinnabar);
+}
+
+/* ---------- 列表（生词本 / 错拼清单） ---------- */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  align-items: flex-start;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--border);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.row__word {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.row__meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* ---------- 趋势：日柱 ---------- */
+.trend {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  height: 132px;
+  margin-top: var(--space-md);
+}
+
+.trend__day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.trend__stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 100%;
+}
+
+.trend__bar {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
+.trend__bar--review {
+  background: var(--matcha);
+}
+
+.trend__bar--new {
+  background: var(--cinnabar);
+}
+
+.trend__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.legend__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}

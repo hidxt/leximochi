@@ -136,6 +136,16 @@ export interface WordPage {
   nextCursor: string | null;
 }
 
+/** 词条搜索结果项（服务端只返回展示所需字段，不含答案以外的敏感数据） */
+export interface WordSearchItem {
+  id: string;
+  headword: string;
+  phoneticUk: string | null;
+  phoneticUs: string | null;
+  definitionZh: string | null;
+  examMeaning: string | null;
+}
+
 // ---------- 词条详情 ----------
 
 export interface WordSenseDto {

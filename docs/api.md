@@ -231,6 +231,8 @@
 
 ## 7. 词库与词条（Phase 2，需登录）
 
+> 客户端的类型安全封装见 `@leximochi/api-client`：`api.vocabulary`（词库/词条读）、`api.review`（取题/提交/统计）、`api.notebook`（生词本）。Web 端只通过这些方法访问，不手写 fetch。
+
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/wordbooks` | 可用词库列表：`id`/`key`/`name`/`description`/`language`/`version`/`wordCount`/`isSystem`。**词库是数据**：新增词库无需改代码 |
