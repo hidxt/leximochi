@@ -13,7 +13,7 @@
 - **数据不入 Git**：采用「下载 + 导入」流程 —— `npm run fetch:dataset -w @leximochi/server`（代理优先、失败直连，落地 `data/imports/`）+ `npm run import:wordbook -w @leximochi/server -- --file … --key … --name … --system`。
 - **已导入本地开发库**（`apps/server/data/db/leximochi.sqlite`）：`cet4` 4,544 词 / `cet6` 3,991 词（共 6,662 唯一词条，含 1,873 个跨库共享词）、释义 14,092、例句 14,504、短语 48,674、关系 48,206；`word_ai_notes` 为 0（仅词典数据）。
 - **已修复的导入缺陷**：`descCn` 标签被误当英文释义（已清库重导，`definition_en` 计数为 0）；跨词库覆盖共享词导致丢释义（改为并集合并，并加了回归用例）。
-- **已知限制**：来源无音频文件（`audio_*_key` 全为空，音标可用但发音待另寻授权音频源或 Phase 5 TTS）；未映射 `realExamSentence`/`exam`/`remMethod`/词形变化；反义词覆盖较低。
+- **已知限制**：来源无音频文件（`audio_*_key` 全为空，音标可用但发音待另寻授权音频源或 Phase 5 TTS）；**用户级默认口音偏好与播放安排在 Phase 4/5**（依赖音频资源）；未映射 `realExamSentence`/`exam`/`remMethod`/词形变化；反义词覆盖较低。
 - 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测，Phase 2 加入单词模块与后台词库管理）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证，Phase 2 界面未开始改造）
 - **本地开发库的验收痕迹**：后台验收时创建/删除过临时词库 `verify-tmp`，并向 `diligent` 合并过 1 条释义（跨词库并集语义的正常行为）；如需干净数据，按第 3 节命令重新 `fetch:dataset` + `import:wordbook` 即可
 

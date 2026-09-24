@@ -71,6 +71,7 @@
 ## 5. 遗留项（不阻塞 Phase 2 验收，按阶段推进）
 
 1. **音频资源缺失**：当前词库无发音文件，听写在服务端明确降级提示；音频播放接口与 TTS 生成属于 Phase 4/5。
-2. **Android 未做真机/模拟器运行验证**：本机无 AVD 与真机（用户已确认按「可构建 + 单测」验收）。
-3. **Python/其他工具未引入**：Phase 2 未安装任何额外系统软件；`@react-native-async-storage/async-storage` 为项目内 npm 依赖。
-4. **词库数据不入 Git**：使用「下载 + 导入」流程（`npm run fetch:dataset` + `npm run import:wordbook`），来源与授权记录见 `docs/asset-licenses.md`。
+2. **英美发音的边界**：英式/美式音标与音频 key 已入库、随词条返回并展示，后台可上传两种口音的音频；**用户级「默认口音偏好」开关与播放**依赖音频资源与播放链路，安排在 Phase 4/5 一并实现（当前无任何音频文件，先做开关无法验证真实效果）。
+3. **Android 未做真机/模拟器运行验证**：本机无 AVD 与真机（用户已确认按「可构建 + 单测」验收）。
+4. **未安装任何额外系统软件**：Phase 2 仅新增项目内 npm 依赖（含 `@react-native-async-storage/async-storage`）。
+5. **词库数据不入 Git**：使用「下载 + 导入」流程（`npm run fetch:dataset` + `npm run import:wordbook`），来源与授权记录见 `docs/asset-licenses.md`。
