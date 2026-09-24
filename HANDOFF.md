@@ -6,7 +6,7 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-24
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1–13（SM-2、题型/DTO 契约、schema 与迁移、StorageProvider、词库只读接口、CET-4/6 导入、复习落库与幂等、出题与选词、拼写与听写、生词本、学习历史与统计、管理后台词库接口、Web 单词模块）。剩余 Task 14–16。
+- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1–14（SM-2、题型/DTO 契约、schema 与迁移、StorageProvider、词库只读接口、CET-4/6 导入、复习落库与幂等、出题与选词、拼写与听写、生词本、学习历史与统计、管理后台词库接口、Web 单词模块、Admin 词库管理界面）。剩余 Task 15–16。
 
 ### 词库数据现状（Task 6 完成）
 - **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
@@ -14,7 +14,8 @@
 - **已导入本地开发库**（`apps/server/data/db/leximochi.sqlite`）：`cet4` 4,544 词 / `cet6` 3,991 词（共 6,662 唯一词条，含 1,873 个跨库共享词）、释义 14,092、例句 14,504、短语 48,674、关系 48,206；`word_ai_notes` 为 0（仅词典数据）。
 - **已修复的导入缺陷**：`descCn` 标签被误当英文释义（已清库重导，`definition_en` 计数为 0）；跨词库覆盖共享词导致丢释义（改为并集合并，并加了回归用例）。
 - **已知限制**：来源无音频文件（`audio_*_key` 全为空，音标可用但发音待另寻授权音频源或 Phase 5 TTS）；未映射 `realExamSentence`/`exam`/`remMethod`/词形变化；反义词覆盖较低。
-- 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证）。Phase 2 尚在服务端与共享包阶段，四端界面未开始改造
+- 当前可运行端：**服务端 + Web + Admin**（均已浏览器实测，Phase 2 加入单词模块与后台词库管理）；**Android 已通过构建验证**（产出 debug APK，未做设备运行验证，Phase 2 界面未开始改造）
+- **本地开发库的验收痕迹**：后台验收时创建/删除过临时词库 `verify-tmp`，并向 `diligent` 合并过 1 条释义（跨词库并集语义的正常行为）；如需干净数据，按第 3 节命令重新 `fetch:dataset` + `import:wordbook` 即可
 
 ---
 
@@ -166,7 +167,7 @@ leximochi/
 | --- | --- |
 | `apps/server` | ✅ 可运行：`npm run build -w @leximochi/server` 后 `node --env-file-if-exists=.env dist/main.js`；实测 `/health` 200、404 统一错误格式、helmet 安全头齐全、自动建库并生成 WAL；另实测 `create-admin` 脚本三条路径 |
 | `apps/web` | ✅ 可运行：`npm run dev -w @leximochi/web`（5173）。Phase 1 实测：注册（含恢复码保存确认）→ 登录 → 刷新恢复会话 → 登出。Phase 2 追加实测（真实数据、控制台无报错）：词库选择（六级 3991 词 / 四级 4544 词，版本 v2）→ 新词学习（选择题答对落「对」印章，返回服务端 SM-2 状态与次日到期）→ 拼写训练（答错记录错字母分类）→ 听写（无音频时明确提示「暂不可用」）→ 生词本（搜索加入/移出）→ 学习统计（今日量、正确率、平均用时、7 日趋势、错拼清单）→ 我的（设备会话） |
-| `apps/admin` | ✅ 可运行：`npm run dev -w @leximochi/admin`（5174）；已实测管理员登录、用户检索、封禁（二次确认+原因）、审计日志、非管理员被拒 |
+| `apps/admin` | ✅ 可运行：`npm run dev -w @leximochi/admin`（5174）。Phase 1 实测：管理员登录、用户检索、封禁（二次确认+原因）、审计日志、非管理员被拒。Phase 2 追加实测（真实数据）：词库列表（cet6 3991 词 / cet4 4544 词）→ 新建词库 → 删除（二次确认弹窗）→ 词条检索（词形/释义、音频状态、分页）→ 批量导入（临时词库：新增 0 / 更新 1 / 失败 2，逐条显示「缺少词形」「存在空的例句」）→ 审计日志确认写入 `admin.wordbook.created`/`admin.wordbook.deleted`/`admin.words.imported` |
 | `apps/mobile` | ✅ 可构建：`npm run build:android -w @leximochi/mobile` → `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`（约 117 MB，含 4 ABI）。**未做运行验证**（本机无 AVD / 无真机） |
 | `packages/api-client`、`packages/auth` | ✅ 已实现并有单测（分别为 7、5 个用例）；尚未被任何前端消费 |
 
@@ -176,7 +177,7 @@ leximochi/
 
 ### Phase 2 进度（计划 `docs/plans/2026-09-22-phase-2-vocabulary.md`）
 - ✅ Task 1–13：SM-2 核心（`packages/core/src/sm2.ts`）、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单、生词本 `/notebook`、学习历史与统计 `/review/history`、`/review/stats`、管理后台词库接口、Web 单词模块（`api.vocabulary`/`api.review`/`api.notebook` + 首页/单词/练习/生词本/统计/我的六个页面，已浏览器实测）。
-- ⬜ Task 14 Admin 词库管理界面 → Task 15 Android 单词模块 → Task 16 Phase 2 验收。
+- ⬜ Task 15 Android 单词模块 → Task 16 Phase 2 验收。
 
 ### Phase 1（已完成，历史）
 - Monorepo 地基、`@leximochi/types|core|shared|api-client|auth`、服务端骨架与数据库层、账号/登录/恢复码/RBAC、`apps/web`、`apps/admin`、`apps/mobile`（APK 构建通过）、`docs/phase-1-acceptance.md`。
@@ -192,7 +193,7 @@ leximochi/
 | `npm install` | 成功（root + 全部 workspace） |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | exit 0：服务端 213、core 33、types 10、api-client 7、auth 7、web 13、admin 6、mobile 2（合计 **291 个用例**） |
+| `npm test` | exit 0：服务端 213、core 33、types 10、api-client 7、auth 7、web 13、admin 14、mobile 2（合计 **299 个用例**） |
 | `npm run build` | exit 0 |
 
 ### 服务端专项
@@ -300,9 +301,8 @@ leximochi/
 2. **Task 11**：学习历史与统计 `/review/history`、`/review/stats`（今日量、正确率、平均用时、已掌握、近 7 日趋势）。
 3. **Task 12**：管理后台词库接口（RBAC 新权限 `admin.wordbooks.*`/`admin.words.*`、词库与词条 CRUD、批量导入、音频上传，全部写审计）。
 4. **Task 13**：Web 单词模块（新词卡片、多题型复习、拼写/听写、生词本、统计页），须浏览器实测。
-5. **Task 14**：Admin 端词库管理界面（词库列表/新建/编辑、词条检索编辑、批量导入错误明细、音频上传）。
-6. **Task 15**：Android 单词模块（离线词库下载与本地读取、学习/复习、拼写/听写）。
-7. **Task 16**：Phase 2 验收（全量 test/lint/typecheck/build + 浏览器与 Android 实测 + 安全自检 + `docs/phase-2-acceptance.md`）。
+5. **Task 15**：Android 单词模块（离线词库下载与本地读取、学习/复习、拼写/听写）。
+6. **Task 16**：Phase 2 验收（全量 test/lint/typecheck/build + 浏览器与 Android 实测 + 安全自检 + `docs/phase-2-acceptance.md`）。
 
 执行每一步时对照 `docs/plans/2026-09-22-phase-2-vocabulary.md` 的任务与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。
 

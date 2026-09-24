@@ -31,7 +31,9 @@ export class HttpClient {
     }
 
     const headers: Record<string, string> = { accept: 'application/json' };
-    if (request.body !== undefined) headers['content-type'] = 'application/json';
+    // FormData（文件上传）由浏览器自行设置 multipart 边界，不能手动指定 content-type
+    const isFormData = typeof FormData !== 'undefined' && request.body instanceof FormData;
+    if (request.body !== undefined && !isFormData) headers['content-type'] = 'application/json';
     const token = this.options.getAccessToken?.();
     if (token && !request.anonymous) headers.authorization = `Bearer ${token}`;
     if (this.options.clientType) headers['x-client-type'] = this.options.clientType;
@@ -41,7 +43,9 @@ export class HttpClient {
       method: request.method ?? 'GET',
       headers,
       credentials: this.options.credentials ?? 'omit',
-      ...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {}),
+      ...(request.body === undefined
+        ? {}
+        : { body: isFormData ? (request.body as FormData) : JSON.stringify(request.body) }),
     });
 
     if (!response.ok) {

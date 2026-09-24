@@ -1,4 +1,5 @@
 import { adminEndpoints } from './endpoints/admin.endpoints';
+import { adminVocabularyEndpoints } from './endpoints/admin-vocabulary.endpoints';
 import { authEndpoints } from './endpoints/auth.endpoints';
 import {
   notebookEndpoints,
@@ -10,6 +11,12 @@ import { HttpClient, type HttpClientOptions } from './http-client';
 export * from './api-error';
 export * from './http-client';
 export type { AdminUserQuery, AuditLogQuery } from './endpoints/admin.endpoints';
+export type {
+  AdminWordbookDetail,
+  AdminWordContentInput,
+  AdminWordQuery,
+  ImportWordsResult,
+} from './endpoints/admin-vocabulary.endpoints';
 export type { RefreshResult } from './endpoints/auth.endpoints';
 export type { AddNotebookInput, SearchWordsQuery } from './endpoints/vocabulary.endpoints';
 
@@ -21,7 +28,7 @@ export function createApiClient(options: HttpClientOptions) {
     vocabulary: vocabularyEndpoints(http),
     review: reviewEndpoints(http),
     notebook: notebookEndpoints(http),
-    admin: adminEndpoints(http),
+    admin: { ...adminEndpoints(http), vocabulary: adminVocabularyEndpoints(http) },
   };
 }
 

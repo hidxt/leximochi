@@ -5,6 +5,7 @@
   --ink-soft: #6a6055;
   --cinnabar: #c8382b;
   --danger: #a62d22;
+  --matcha: #3e7c59;
   --border: #e4daca;
   --rule: #ddd2c0;
 
@@ -266,4 +267,55 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 6px;
+}
+
+/* ---------- Phase 2：词库与词条管理 ---------- */
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  align-self: end;
+  padding-bottom: 8px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notice--success {
+  border-left-color: var(--matcha);
+  background: rgba(62, 124, 89, 0.08);
+}
+
+.dialog--wide {
+  width: min(760px, 92vw);
+}
+
+.dialog textarea,
+.editor textarea {
+  width: 100%;
+  min-height: 84px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor .filters {
+  margin-bottom: 0;
+}
+
+.filters input[type='file'] {
+  padding: 5px;
+  background: #fff;
 }

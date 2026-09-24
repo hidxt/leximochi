@@ -3,8 +3,10 @@ import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import type { MeResponse } from '@leximochi/types';
 import { api, isAdmin, session } from './lib/api';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminWordsPage } from './pages/AdminWordsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { UsersPage } from './pages/UsersPage';
+import { WordbooksPage } from './pages/WordbooksPage';
 
 type State = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -85,6 +87,8 @@ export function App(): ReactElement {
           <h1 className="topbar__title">词团子 · 管理后台</h1>
           <nav style={{ display: 'flex', gap: 12 }}>
             <NavLink to="/users">用户</NavLink>
+            <NavLink to="/wordbooks">词库</NavLink>
+            <NavLink to="/words">词条</NavLink>
             <NavLink to="/audit">审计日志</NavLink>
           </nav>
         </div>
@@ -98,6 +102,8 @@ export function App(): ReactElement {
 
       <Routes>
         <Route path="/users" element={<UsersPage api={api} />} />
+        <Route path="/wordbooks" element={<WordbooksPage api={api} />} />
+        <Route path="/words" element={<AdminWordsPage api={api} />} />
         <Route path="/audit" element={<AuditLogsPage api={api} />} />
         <Route path="*" element={<Navigate to="/users" replace />} />
       </Routes>
