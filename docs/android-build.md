@@ -77,8 +77,9 @@ npm workspaces 会把 `react-native` 及其传递依赖提升到**仓库根** `n
 
 ## 5. 网络与代理
 
-- `apps/mobile/android/gradle.properties` 已配置**项目范围**代理（`127.0.0.1:10808`），并通过 `nonProxyHosts` 让可直连的域名（`dl.google.com`、`services.gradle.org`、npm 源、localhost）**不走代理**。
-- 本机实测：`repo.maven.apache.org` 直连超时（需代理），`dl.google.com` 与 `services.gradle.org` 直连可用。
+- `apps/mobile/android/gradle.properties` 已配置**项目范围**代理（`127.0.0.1:10808`），并通过 `nonProxyHosts` 让可直连的域名（`dl.google.com`、`services.gradle.org`、`repo.maven.apache.org`、npm 源、localhost）**不走代理**。
+- 网络实测（2026-09-24 复测）：`repo.maven.apache.org` **直连可用**（200），经本机代理反而不可用（000），因此 Maven Central 也列入直连名单；`dl.google.com` 与 `services.gradle.org` 直连可用。
+- 若将来某仓库直连超时，按项目规则「代理优先、失败切直连」处理：从 `nonProxyHosts` 中移除该域名即可恢复走代理；不要修改系统级/全局代理配置。
 - 若代理未启动，构建仍可完成（官方 Google 源直连可用）；若某仓库确实无法访问，按项目规则「代理优先、失败切直连」，不要修改系统级/全局代理配置。
 
 ---
