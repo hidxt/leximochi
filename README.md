@@ -9,7 +9,8 @@ Gamified English learning with vocabulary, AI speaking, listening practice, and 
 - 阶段计划：`docs/plans/`
 - 接口清单：`docs/api.md`
 - Android 构建（含全新克隆后的完整步骤与调试密钥生成命令）：`docs/android-build.md`
-- Phase 验收报告：`docs/phase-1-acceptance.md`
+- 词库数据来源与许可证：`docs/asset-licenses.md`
+- Phase 验收报告：`docs/phase-1-acceptance.md`、`docs/phase-2-acceptance.md`
 
 ## 开发环境要求
 

@@ -6,7 +6,7 @@
 > 若本文件与真实代码、Git 状态或实际测试结果不一致，以真实代码/Git/测试为事实来源，并修正本文件。
 
 - 快照时间：2026-09-24
-- 当前阶段：**Phase 2（单词核心）执行中** —— 已完成 Task 1–15（SM-2、题型/DTO 契约、schema 与迁移、StorageProvider、词库只读接口、CET-4/6 导入、复习落库与幂等、出题与选词、拼写与听写、生词本、学习历史与统计、管理后台词库接口、Web 单词模块、Admin 词库管理界面、Android 单词模块）。剩余 Task 16（Phase 2 验收）。
+- 当前阶段：**Phase 2（单词核心）已验收完成**（Task 1–16 全部完成，验收报告 `docs/phase-2-acceptance.md`）。下一步按 `开发提示词.md` 进入 **Phase 3（学习与宠物闭环）**：每日目标、学习积分、连续学习、金币、Reward Ledger、宠物 EXP/心情/饱食度、Sprite 动画与升级解锁。
 
 ### 词库数据现状（Task 6 完成）
 - **数据源**：`KyleBing/english-vocabulary`（`full_line_jsonl/full/正序/`）。作者授权由用户于 2026-09-23 确认取得；**具体条款与凭证待补充**，登记见 `docs/asset-licenses.md`。
@@ -176,8 +176,8 @@ leximochi/
 ## 8. 已完成 / 进行中 / 未完成
 
 ### Phase 2 进度（计划 `docs/plans/2026-09-22-phase-2-vocabulary.md`）
-- ✅ Task 1–15：SM-2 核心（`packages/core/src/sm2.ts`）、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单、生词本 `/notebook`、学习历史与统计、管理后台词库接口、Web 单词模块（六页，已浏览器实测）、Admin 词库管理（两页 + 导入对话框，已浏览器实测）、Android 单词模块（词库下载/离线查词 + 练习 + 我的，APK 构建通过）。
-- ⬜ Task 16 Phase 2 验收（全量检查 + 浏览器/Android 实测 + 安全自检 + `docs/phase-2-acceptance.md`）。
+- ✅ Task 1–16 全部完成：SM-2 核心、题型/DTO 契约、13 张新表与迁移 `0001_thin_pandemic.sql`、StorageProvider 与上传安全、词库只读接口、CET-4/6 导入（数据不入 Git）、`/review/submit` 幂等落库、`/study/next` 出题与选词、拼写/听写错拼惩罚与错拼清单、生词本、学习历史与统计、管理后台词库接口、Web 单词模块（六页）、Admin 词库管理（两页 + 导入对话框）、Android 单词模块（离线词库 + 练习 + 我的）。
+- ✅ Task 16 验收：`docs/phase-2-acceptance.md`（14 项标准逐条对照 + 安全自检）。
 
 ### Phase 1（已完成，历史）
 - Monorepo 地基、`@leximochi/types|core|shared|api-client|auth`、服务端骨架与数据库层、账号/登录/恢复码/RBAC、`apps/web`、`apps/admin`、`apps/mobile`（APK 构建通过）、`docs/phase-1-acceptance.md`。
@@ -193,7 +193,7 @@ leximochi/
 | `npm install` | 成功（root + 全部 workspace） |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | exit 0：服务端 213、core 33、types 10、api-client 7、auth 7、web 13、admin 14、mobile 9（合计 **306 个用例**） |
+| `npm test` | exit 0：服务端 217、core 33、types 10、api-client 7、auth 7、web 13、admin 14、mobile 9（合计 **310 个用例**） |
 | `npm run build` | exit 0 |
 
 ### 服务端专项
@@ -245,13 +245,15 @@ leximochi/
 3. `IP` 与 `user_agent` 原样存库用于安全审计，**尚未实现保留期与清理策略**。
 4. 全局限流仍是 `@nestjs/throttler` 默认内存存储（120 req/min/IP），未与 `auth_attempts` 联动。
 5. npm 11 默认拦截依赖 postinstall：esbuild 的 postinstall 被忽略；若后续 Vite/Vitest 因二进制缺失失败，需告知用户并取得同意后再处理（不得静默 `npm approve-scripts`）。
+6. `npm audit` 仍有 4 个 moderate 告警，全部来自 dev 工具链（`drizzle-kit → @esbuild-kit/core-utils → esbuild ≤0.24.2`）；修复需 `--force` 破坏性升级，故暂留。**生产依赖 0 漏洞**（`npm audit --omit=dev`）。
+7. 当前词库无音频资源，听写在服务端明确降级提示；音频播放接口与 TTS 生成属于 Phase 4/5。
 
 ### 风险
 | 风险 | 影响 | 现状 |
 | --- | --- | --- |
 | Nest 12 ESM + Jest 组合较新 | 新测试文件若忘记 `--experimental-vm-modules` 会报 `createRequireEsmError` | 脚本已固化；README/HANDOFF 记录 |
-| Android 首次构建需下载 Gradle 9.4.1 与全部依赖 | 耗时长（预计 >10 分钟） | 未开始；`servicess.gradle.org` 直连可达 |
-| Maven Central 直连不可达 | Android 构建拉依赖失败 | 计划：项目内 `gradle.properties` 代理配置（Task 14） |
+| Android 构建耗时较长 | 首次 20 分钟级，增量约 6–7 分钟 | Phase 2 实测 `BUILD SUCCESSFUL in 6m 42s`（含 AsyncStorage 原生模块） |
+| Maven Central 可达性会变化 | 构建拉依赖失败 | 2026-09-24 复测直连可用、经代理不可用；`gradle.properties` 的项目内代理 + `nonProxyHosts` 已按实测调整，必要时把域名移出 `nonProxyHosts` 即恢复走代理 |
 | 无 AVD / 无连接设备 | Android 仅能做「可构建」验证 | 用户已确认按此范围验收 |
 | 未 push 到远端 | 仅本地存在 | 由用户决定何时推送 |
 
@@ -301,7 +303,7 @@ leximochi/
 2. **Task 11**：学习历史与统计 `/review/history`、`/review/stats`（今日量、正确率、平均用时、已掌握、近 7 日趋势）。
 3. **Task 12**：管理后台词库接口（RBAC 新权限 `admin.wordbooks.*`/`admin.words.*`、词库与词条 CRUD、批量导入、音频上传，全部写审计）。
 4. **Task 13**：Web 单词模块（新词卡片、多题型复习、拼写/听写、生词本、统计页），须浏览器实测。
-5. **Task 16**：Phase 2 验收（全量 test/lint/typecheck/build + 浏览器与 Android 实测 + 安全自检 + `docs/phase-2-acceptance.md`）。
+Phase 2 已全部完成并验收（见 `docs/phase-2-acceptance.md`）；下一步进入 **Phase 3（学习与宠物闭环）**，开始前先写 Phase 3 实施计划与验收标准。
 
 执行每一步时对照 `docs/plans/2026-09-22-phase-2-vocabulary.md` 的任务与验收标准，并把新的实施偏差追加到该文件的「实施偏差记录」。
 
