@@ -66,6 +66,12 @@ describe('数据库层', () => {
       'admin.audit.read',
       'admin.users.ban',
       'admin.users.read',
+      'admin.wordbooks.read',
+      'admin.wordbooks.write',
+      'admin.words.audio',
+      'admin.words.import',
+      'admin.words.read',
+      'admin.words.write',
     ]);
 
     const links = db.sqlite
@@ -74,7 +80,7 @@ describe('数据库层', () => {
          JOIN roles r ON r.id = rp.role_id WHERE r.key = 'admin'`,
       )
       .get() as { c: number };
-    expect(links.c).toBe(3);
+    expect(links.c).toBe(9);
   });
 
   it('外键约束生效：插入不存在用户的会话被拒绝', () => {

@@ -1,17 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, sql } from 'drizzle-orm';
-import {
-  wordAiNotes,
-  wordExamples,
-  wordForms,
-  wordPhrases,
-  wordRelations,
-  wordSenses,
-  wordbookEntries,
-  wordbooks,
-  words,
-} from '../../../database/schema';
+import { and, eq, sql } from 'drizzle-orm';
+import { wordbookEntries, wordbooks, words } from '../../../database/schema';
 import { DATABASE } from '../../../database/database.constants';
 import type { DatabaseService, DrizzleDb } from '../../../database/database.service';
 import type {
@@ -20,12 +10,11 @@ import type {
   ImportWordInput,
   ImportWordbookInput,
 } from './import.types';
-
-const MAX_SENSES_PER_WORD = 30;
-const MAX_EXAMPLES_PER_WORD = 30;
-const MAX_PHRASES_PER_WORD = 50;
-const MAX_FORMS_PER_WORD = 20;
-const MAX_RELATIONS_PER_WORD = 50;
+import {
+  MAX_SENSES_PER_WORD,
+  readExistingWord,
+  writeNestedWordContent,
+} from './word-content-writer';
 
 /**
  * 词库批量导入。
@@ -110,90 +99,7 @@ export class WordImportService {
         }
 
         // 词典数据整段替换：导入是「以来源为准」的全量覆盖
-        tx.delete(wordSenses).where(eq(wordSenses.wordId, wordId)).run();
-        tx.delete(wordExamples).where(eq(wordExamples.wordId, wordId)).run();
-        tx.delete(wordPhrases).where(eq(wordPhrases.wordId, wordId)).run();
-        tx.delete(wordForms).where(eq(wordForms.wordId, wordId)).run();
-        tx.delete(wordRelations).where(eq(wordRelations.wordId, wordId)).run();
-
-        incoming.senses.slice(0, MAX_SENSES_PER_WORD).forEach((sense, order) => {
-          tx.insert(wordSenses)
-            .values({
-              id: randomUUID(),
-              wordId,
-              partOfSpeech: sense.partOfSpeech ?? null,
-              definitionZh: sense.definitionZh.trim(),
-              definitionEn: sense.definitionEn ?? null,
-              examMeaning: sense.examMeaning ?? null,
-              sortOrder: order,
-            })
-            .run();
-        });
-
-        (incoming.examples ?? []).slice(0, MAX_EXAMPLES_PER_WORD).forEach((example, order) => {
-          tx.insert(wordExamples)
-            .values({
-              id: randomUUID(),
-              wordId,
-              senseId: null,
-              textEn: example.textEn.trim(),
-              textZh: example.textZh.trim(),
-              audioKey: null,
-              sortOrder: order,
-            })
-            .run();
-        });
-
-        (incoming.phrases ?? []).slice(0, MAX_PHRASES_PER_WORD).forEach((phrase, order) => {
-          tx.insert(wordPhrases)
-            .values({
-              id: randomUUID(),
-              wordId,
-              kind: phrase.kind ?? 'phrase',
-              text: phrase.text.trim(),
-              translation: phrase.translation.trim(),
-              sortOrder: order,
-            })
-            .run();
-        });
-
-        (incoming.forms ?? []).slice(0, MAX_FORMS_PER_WORD).forEach((form) => {
-          tx.insert(wordForms)
-            .values({ id: randomUUID(), wordId, formType: form.formType, value: form.value })
-            .run();
-        });
-
-        (incoming.relations ?? []).slice(0, MAX_RELATIONS_PER_WORD).forEach((relation) => {
-          tx.insert(wordRelations)
-            .values({
-              id: randomUUID(),
-              wordId,
-              relationType: relation.relationType,
-              targetWordId: relation.targetWordId ?? null,
-              targetText: relation.targetText ?? null,
-            })
-            .run();
-        });
-
-        // AI 补充内容单独一张表：只在来源提供时才写入，绝不触碰词典字段
-        if (incoming.aiNotes) {
-          tx.delete(wordAiNotes).where(eq(wordAiNotes.wordId, wordId)).run();
-          tx.insert(wordAiNotes)
-            .values({
-              id: randomUUID(),
-              wordId,
-              memoryTip: incoming.aiNotes.memoryTip ?? null,
-              usageNote: incoming.aiNotes.usageNote ?? null,
-              confusableNote: incoming.aiNotes.confusableNote ?? null,
-              extraExamplesJson: incoming.aiNotes.extraExamples
-                ? JSON.stringify(incoming.aiNotes.extraExamples)
-                : null,
-              provider: incoming.aiNotes.provider ?? null,
-              model: incoming.aiNotes.model ?? null,
-              generatedAt: now,
-            })
-            .run();
-        }
+        writeNestedWordContent(tx, wordId, incoming, now);
 
         // 词库条目：同一词库内幂等
         tx.delete(wordbookEntries)
@@ -367,49 +273,5 @@ export function mergeWords(base: ImportWordInput, extra: ImportWordInput): Impor
       (relation) => `${relation.relationType}|${relation.targetWordId ?? relation.targetText ?? ''}`,
     ),
     aiNotes: base.aiNotes ?? extra.aiNotes ?? null,
-  };
-}
-
-/** 读取库内已有的词条及其嵌套内容，转成导入中间格式，便于与新数据合并 */
-function readExistingWord(tx: DrizzleDb, wordId: string): ImportWordInput {
-  const word = tx.select().from(words).where(eq(words.id, wordId)).get();
-  const senses = tx.select().from(wordSenses).where(eq(wordSenses.wordId, wordId)).orderBy(asc(wordSenses.sortOrder)).all();
-  const examples = tx.select().from(wordExamples).where(eq(wordExamples.wordId, wordId)).orderBy(asc(wordExamples.sortOrder)).all();
-  const phrases = tx.select().from(wordPhrases).where(eq(wordPhrases.wordId, wordId)).orderBy(asc(wordPhrases.sortOrder)).all();
-  const forms = tx.select().from(wordForms).where(eq(wordForms.wordId, wordId)).all();
-  const relations = tx.select().from(wordRelations).where(eq(wordRelations.wordId, wordId)).all();
-  const ai = tx.select().from(wordAiNotes).where(eq(wordAiNotes.wordId, wordId)).get();
-
-  return {
-    headword: word?.headword ?? '',
-    phoneticUk: word?.phoneticUk ?? null,
-    phoneticUs: word?.phoneticUs ?? null,
-    audioUkKey: word?.audioUkKey ?? null,
-    audioUsKey: word?.audioUsKey ?? null,
-    rank: null,
-    tags: [],
-    senses: senses.map((s) => ({
-      partOfSpeech: s.partOfSpeech,
-      definitionZh: s.definitionZh,
-      definitionEn: s.definitionEn,
-      examMeaning: s.examMeaning,
-    })),
-    examples: examples.map((e) => ({ textEn: e.textEn, textZh: e.textZh })),
-    phrases: phrases.map((p) => ({ kind: p.kind, text: p.text, translation: p.translation })),
-    forms: forms.map((f) => ({ formType: f.formType, value: f.value })),
-    relations: relations.map((r) => ({
-      relationType: r.relationType as 'synonym' | 'antonym' | 'confusable' | 'derived',
-      targetWordId: r.targetWordId,
-      targetText: r.targetText,
-    })),
-    aiNotes: ai
-      ? {
-          memoryTip: ai.memoryTip,
-          usageNote: ai.usageNote,
-          confusableNote: ai.confusableNote,
-          provider: ai.provider,
-          model: ai.model,
-        }
-      : null,
   };
 }

@@ -221,4 +221,7 @@ export interface StorageProvider {
 | --- | --- | --- | --- |
 | D1 | Task 9 只列「错拼分类 + 加权复习」，未列出查询接口 | 增加 `GET /review/spelling-errors`（按词聚合错拼次数与分类，`total` 为错拼词条总数，`limit` ≤ 100） | 「错拼清单/统计给用户看」需要服务端出口；放在 Task 9 而非 Task 11（后者是学习历史与整体统计） |
 | D2 | 「错拼后 7 天内提高该词的出现权重」写成散文描述 | 在 `packages/core/src/sm2.ts` 导出常量 `MISSPELL_PRIORITY_WINDOW_DAYS = 7`，`StudyService` 引用它；删除原型期的函数 `spellingPriorityBoostDays`（无调用方，避免出现第二个「7 天」来源） | DRY + 避免死代码；跨端共用同一常量 |
+| D4 | Task 12 只要求「词库/词条 CRUD + 导入 + 音频上传」 | 抽出 `WordWriteService`（单条写入：create/replace/merge + 按 id 更新 + 删除 + 写音频 key）与 `word-content-writer.ts`（嵌套内容读写），批量导入改为复用同一实现；元数据更新不递增 `version`（只有词条内容变化才递增，避免客户端无谓重新下载） | 避免批量导入与后台单条编辑两套嵌套写入逻辑产生行为差异；`version` 语义保持「内容版本」 |
+| D5 | 未说明后台词条删除的影响范围 | 词条跨词库共享，删除会同时从所有引用词库移除，并递增受影响词库版本；删除词库只解除关联、保留共享词条 | 与「词条全局共享」的数据模型一致，避免一个词库的删除动作静默破坏其他词库 |
+
 | D3 | 计划未说明错拼惩罚与「答错」惩罚的叠加顺序 | 先 `applySpellingPenalty` 降难度，再 `applySm2` 计算调度；两者独立累减，下限仍为 1.3 | 顺序影响难度下限的钳制次数，固定为先惩罚后调度并写入注释与测试（`spelling-training.e2e-spec.ts` 断言 2.2 / 2.3 / 2.07） |

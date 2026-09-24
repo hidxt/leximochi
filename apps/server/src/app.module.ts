@@ -11,6 +11,7 @@ import { DatabaseModule } from './database/database.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AdminVocabularyModule } from './modules/admin-vocabulary/admin-vocabulary.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
@@ -29,6 +30,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     VocabularyModule,
     LearningModule,
     AdminModule,
+    AdminVocabularyModule,
     HealthModule,
   ],
   providers: [

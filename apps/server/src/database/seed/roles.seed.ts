@@ -22,7 +22,17 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     key: RoleKey.Admin,
     name: '管理员',
     description: '管理后台身份',
-    permissions: [Permission.AdminUsersRead, Permission.AdminUsersBan, Permission.AdminAuditRead],
+    permissions: [
+      Permission.AdminUsersRead,
+      Permission.AdminUsersBan,
+      Permission.AdminAuditRead,
+      Permission.AdminWordbooksRead,
+      Permission.AdminWordbooksWrite,
+      Permission.AdminWordsRead,
+      Permission.AdminWordsWrite,
+      Permission.AdminWordsImport,
+      Permission.AdminWordsAudio,
+    ],
   },
 ];
 

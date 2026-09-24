@@ -164,6 +164,17 @@
 | `admin.users.ban` | `POST /admin/users/:id/ban` | Body `{ "reason": string(2–200) }`；撤销该用户全部会话；写审计 `admin.user.banned`；**禁止封禁自己**（400） |
 | `admin.users.ban` | `POST /admin/users/:id/unban` | 解封；**不恢复**旧会话；写审计 `admin.user.unbanned` |
 | `admin.audit.read` | `GET /admin/audit-logs?action=&actorUserId=&targetId=&targetType=&limit=&cursor=` | 只读审计查询 |
+| `admin.wordbooks.read` | `GET /admin/wordbooks`、`GET /admin/wordbooks/:id` | 词库列表与详情（列表来自数据，新增词库无需改代码） |
+| `admin.wordbooks.write` | `POST /admin/wordbooks` | 新建词库：`{ key, name, description?, language?, isSystem? }`；`key` 为小写字母/数字/`_`/`-`（2–32 位），重复返回 `409 WORDBOOK_KEY_TAKEN`；审计 `admin.wordbook.created` |
+| `admin.wordbooks.write` | `PATCH /admin/wordbooks/:id` | 改元数据（名称/描述/语言/是否系统）；**不改变 `version`**（`version` 只表达词条内容变化）；审计 `admin.wordbook.updated` |
+| `admin.wordbooks.write` | `DELETE /admin/wordbooks/:id` | 高风险：Body 必须 `{ "confirm": true }`，否则 400；只解除词库与词条的关联，共享词条保留；审计 `admin.wordbook.deleted` |
+| `admin.words.read` | `GET /admin/words?query=&wordbookId=&cursor=&limit=` | 词条检索（`query` 匹配词形或释义，LIKE 通配符已转义）；游标为 `wordId` 升序 |
+| `admin.words.read` | `GET /admin/words/:id` | 词条完整内容（词典数据 + AI 补充），供编辑表单使用 |
+| `admin.words.write` | `POST /admin/words` | 新建词条：`{ wordbookId, headword, phoneticUk?, phoneticUs?, rank?, tags?, senses[], examples?, phrases?, forms?, relations?, aiNotes? }`；词形已存在返回 `409 CONFLICT`；成功写入并递增该词库 `version`/`wordCount`；审计 `admin.word.created` |
+| `admin.words.write` | `PATCH /admin/words/:id` | 以提交内容为准**整段替换**词典内容（可删减义项）；改名撞词形返回 409；审计 `admin.word.updated` |
+| `admin.words.write` | `DELETE /admin/words/:id` | 高风险：Body 必须 `{ "confirm": true }`；词条跨词库共享，删除会同时从所有词库移除；审计 `admin.word.deleted` |
+| `admin.words.import` | `POST /admin/words/import` | 批量导入：`{ wordbookKey, wordbookName, description?, items[] }`（≤500 条）；返回 `{ created, updated, failed[{index, headword, reason}], version, wordCount }`，**单条失败不影响其余词条**；审计 `admin.words.imported` |
+| `admin.words.audio` | `POST /admin/words/:id/audio` | `multipart/form-data`：字段 `file` + `kind=uk\|us`。校验大小（≤5MB）、扩展名白名单、**按文件头识别的真实 MIME**、文件名安全；存储 key 由服务端生成；词条不存在返回 404；审计 `admin.word.audio_uploaded` |
 
 分页响应：
 

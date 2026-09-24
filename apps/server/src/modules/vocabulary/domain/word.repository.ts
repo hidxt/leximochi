@@ -1,4 +1,5 @@
 import type {
+  AdminWordListItem,
   WordAiNotesDto,
   WordExampleDto,
   WordExportEntry,
@@ -76,4 +77,14 @@ export interface WordRepository {
   listDistractorDefinitions(
     options: { wordbookId?: string; excludeWordId: string; limit: number },
   ): Promise<string[]>;
+  /**
+   * 后台检索词条（按词形或释义模糊匹配，可按词库过滤）。
+   * 游标为 wordId 升序，与离线导出使用同一稳定顺序。
+   */
+  listForAdmin(options: {
+    query?: string;
+    wordbookId?: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<{ items: AdminWordListItem[]; nextCursor: string | null }>;
 }

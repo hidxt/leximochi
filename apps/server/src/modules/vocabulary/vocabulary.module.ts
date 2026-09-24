@@ -6,6 +6,7 @@ import { WORDBOOK_REPOSITORY } from './domain/wordbook.repository';
 import { WordImportService } from './import/word-import.service';
 import { VocabularyController } from './vocabulary.controller';
 import { VocabularyService } from './vocabulary.service';
+import { WordWriteService } from './word-write.service';
 
 @Module({
   controllers: [VocabularyController],
@@ -16,7 +17,14 @@ import { VocabularyService } from './vocabulary.service';
     { provide: WORD_REPOSITORY, useExisting: DrizzleWordRepository },
     VocabularyService,
     WordImportService,
+    WordWriteService,
   ],
-  exports: [WORDBOOK_REPOSITORY, WORD_REPOSITORY, VocabularyService, WordImportService],
+  exports: [
+    WORDBOOK_REPOSITORY,
+    WORD_REPOSITORY,
+    VocabularyService,
+    WordImportService,
+    WordWriteService,
+  ],
 })
 export class VocabularyModule {}

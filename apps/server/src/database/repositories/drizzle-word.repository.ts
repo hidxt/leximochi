@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
 import type {
+  AdminWordListItem,
   WordAiNotesDto,
   WordExportEntry,
   WordExampleDto,
@@ -210,6 +211,72 @@ export class DrizzleWordRepository implements WordRepository {
       definition: string;
     }>;
     return rows.map((row) => row.definition);
+  }
+
+  async listForAdmin(options: {
+    query?: string;
+    wordbookId?: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<{ items: AdminWordListItem[]; nextCursor: string | null }> {
+    const conditions = [];
+    if (options.query) {
+      const pattern = `%${escapeLike(options.query.toLowerCase())}%`;
+      conditions.push(
+        sql`(lower(${words.headword}) LIKE ${pattern} ESCAPE '\\'
+          OR EXISTS (SELECT 1 FROM word_senses s
+                     WHERE s.word_id = words.id AND s.definition_zh LIKE ${pattern}))`,
+      );
+    }
+    if (options.cursor) conditions.push(gt(words.id, options.cursor));
+    if (options.wordbookId) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM wordbook_entries e
+                   WHERE e.word_id = words.id AND e.wordbook_id = ${options.wordbookId})`,
+      );
+    }
+
+    const rows = this.database.db
+      .select({
+        id: words.id,
+        headword: words.headword,
+        phoneticUk: words.phoneticUk,
+        phoneticUs: words.phoneticUs,
+        source: words.source,
+        audioUkKey: words.audioUkKey,
+        audioUsKey: words.audioUsKey,
+        updatedAt: words.updatedAt,
+        definitionZh: sql<string | null>`(
+          SELECT s.definition_zh FROM word_senses s
+          WHERE s.word_id = words.id ORDER BY s.sort_order ASC, s.id ASC LIMIT 1
+        )`,
+        senseCount: sql<number>`(
+          SELECT COUNT(*) FROM word_senses s WHERE s.word_id = words.id
+        )`,
+      })
+      .from(words)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(words.id))
+      .limit(options.limit + 1)
+      .all();
+
+    const hasMore = rows.length > options.limit;
+    const pageRows = hasMore ? rows.slice(0, options.limit) : rows;
+    const last = pageRows[pageRows.length - 1];
+    return {
+      items: pageRows.map((row) => ({
+        id: row.id,
+        headword: row.headword,
+        phoneticUk: row.phoneticUk,
+        phoneticUs: row.phoneticUs,
+        source: row.source,
+        definitionZh: row.definitionZh,
+        senseCount: Number(row.senseCount),
+        hasAudio: Boolean(row.audioUkKey || row.audioUsKey),
+        updatedAt: Number(row.updatedAt),
+      })),
+      nextCursor: hasMore && last ? last.id : null,
+    };
   }
 
   /** 一次取回一批词条的全部嵌套数据，避免逐词查询造成 N+1 */
